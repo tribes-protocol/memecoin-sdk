@@ -1,0 +1,128 @@
+import { Pair } from '@uniswap/v2-sdk'
+import { isAddress, WalletCapabilities, WalletCapabilitiesRecord } from 'viem'
+import { z } from 'zod'
+
+export const EthAddressSchema = z
+  .custom<`0x${string}`>((val): val is `0x${string}` => typeof val === 'string' && isAddress(val))
+  .transform((arg) => arg.toLowerCase() as `0x${string}`)
+
+export type EthAddress = z.infer<typeof EthAddressSchema>
+
+export const HexStringSchema = z
+  .custom<`0x${string}`>((val): val is `0x${string}` => {
+    if (typeof val !== 'string') return false
+    const normalized = val.startsWith('0x') ? val : `0x${val}`
+    return /^0x[a-fA-F0-9]+$/.test(normalized)
+  })
+  .transform((val) => (val.startsWith('0x') ? val : (`0x${val}` as `0x${string}`)))
+
+export type HexString = z.infer<typeof HexStringSchema>
+
+export type GenerateCoinParams = {
+  prompt: string
+}
+
+export type LaunchCoinParams = {
+  name: string
+  ticker: string
+  antiSnipeAmount: bigint
+  image: string
+  website: string
+  twitter: string
+  telegram: string
+  discord: string
+  description: string
+  teamFee: bigint
+  lockingDays?: number
+}
+
+export type ABI = {
+  type: string
+  name: string
+  inputs: {
+    type: string
+    name: string
+    indexed?: boolean
+  }[]
+}[]
+
+export const OnchainDataSchema = z.object({
+  image: z.string().optional(),
+  website: z.string().optional(),
+  twitter: z.string().optional(),
+  telegram: z.string().optional(),
+  discord: z.string().optional(),
+  description: z.string().optional()
+})
+
+export type OnchainData = z.infer<typeof OnchainDataSchema>
+
+export const BasicMemecoinSchema = z.object({
+  name: z.string(),
+  ticker: z.string(),
+  description: z.string()
+})
+
+export const FalGenImageStatusRequestSchema = z.object({
+  requestId: z.string(),
+  model: z.string()
+})
+
+export const GenerateMemecoinFromPhraseResponseSchema = z.object({
+  prompt: z.string(),
+  memecoin: BasicMemecoinSchema,
+  requests: z.array(FalGenImageStatusRequestSchema)
+})
+
+export type GenerateMemecoinFromPhraseResponse = z.infer<
+  typeof GenerateMemecoinFromPhraseResponseSchema
+>
+
+export const HydratedCoinSchema = z.object({
+  createdAt: z.preprocess((arg) => (typeof arg === 'string' ? new Date(arg) : arg), z.date()),
+  contractAddress: EthAddressSchema,
+  dexInitiated: z.boolean(),
+  dexInitiatedBlock: z
+    .string()
+    .transform((arg) => BigInt(arg))
+    .nullable(),
+  creator: EthAddressSchema,
+  memeDeployer: EthAddressSchema,
+  memePool: EthAddressSchema,
+  memeEventTracker: EthAddressSchema,
+  rewardsPool: EthAddressSchema,
+  memeStorage: EthAddressSchema,
+  totalSupply: z.string().transform((arg) => BigInt(arg)),
+  marketCap: z.string().transform((value) => BigInt(value)),
+  creatorUsername: z.string().optional(),
+  creatorImage: z.string().optional(),
+  name: z.string(),
+  ticker: z.string(),
+  description: z.string()
+})
+
+export type HydratedCoin = z.infer<typeof HydratedCoinSchema>
+
+export type TradeParams = {
+  coin: HydratedCoin
+  using: 'eth'
+  amountIn: bigint
+  amountOut: bigint
+  slippage?: number
+  affiliate?: EthAddress
+  pair?: Pair
+  allowance?: bigint
+  lockingDays?: number
+  capabilities?: WalletCapabilitiesRecord<WalletCapabilities, number>
+}
+
+export type EstimateTradeParams = Omit<TradeParams, 'amountOut'>
+
+export type BuyManyParams = {
+  memeCoins: HydratedCoin[]
+  ethAmounts: bigint[]
+  expectedTokensAmounts: bigint[]
+  affiliate?: EthAddress
+  lockingDays?: number
+  capabilities?: WalletCapabilitiesRecord<WalletCapabilities, number>
+}
