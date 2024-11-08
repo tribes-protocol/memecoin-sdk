@@ -2,19 +2,19 @@
 
 import { MemecoinSDK } from '@/Memecoin'
 import {
+  BuyManyParams,
+  EstimateTradeParams,
   EthAddress,
+  GenerateCoinParams,
   GenerateMemecoinFromPhraseResponse,
   HexString,
   HydratedCoin,
-  BuyManyParams,
-  EstimateTradeParams,
-  GenerateCoinParams,
   LaunchCoinParams,
-  TradeParams
+  TradeBuyParams,
+  TradeSellParams
 } from '@/types'
 import { Pair } from '@uniswap/v2-sdk'
 import { createContext, ReactNode, useContext, useMemo } from 'react'
-import { WalletCapabilities, WalletCapabilitiesRecord } from 'viem'
 import { useWalletClient } from 'wagmi'
 
 interface MemecoinContextType {
@@ -22,13 +22,9 @@ interface MemecoinContextType {
   getTrending: () => Promise<HydratedCoin[]>
   estimateBuy: (params: EstimateTradeParams) => Promise<bigint>
   estimateSell: (params: EstimateTradeParams) => Promise<bigint>
-  buy: (params: TradeParams, coin: HydratedCoin) => Promise<HexString>
-  sell: (
-    params: TradeParams,
-    coin: HydratedCoin,
-    capabilities: WalletCapabilitiesRecord<WalletCapabilities, number>
-  ) => Promise<HexString>
-  buyMany: (params: BuyManyParams, memePool: EthAddress) => Promise<HexString>
+  buy: (params: TradeBuyParams) => Promise<HexString>
+  sell: (params: TradeSellParams) => Promise<HexString>
+  buyMany: (params: BuyManyParams) => Promise<HexString>
   generateCoin: (params: GenerateCoinParams) => Promise<GenerateMemecoinFromPhraseResponse>
   launchCoin: (params: LaunchCoinParams) => Promise<[EthAddress, HexString]>
   getTeamFee: () => Promise<bigint>
@@ -43,6 +39,7 @@ interface MemecoinContextType {
 interface MemecoinProviderProps {
   children: ReactNode
   rpcUrl: string
+  apiBaseUrl?: string
 }
 
 const MemecoinContext = createContext<MemecoinContextType | undefined>(undefined)
@@ -55,17 +52,19 @@ export const useMemecoin = (): MemecoinContextType => {
   return context
 }
 
-export const MemecoinProvider = ({ children, rpcUrl }: MemecoinProviderProps): ReactNode => {
+export const MemecoinProvider = ({
+  children,
+  rpcUrl,
+  apiBaseUrl
+}: MemecoinProviderProps): ReactNode => {
   const { data: walletClient } = useWalletClient()
-  if (!walletClient) {
-    throw new Error('MemecoinProvider must be used within a WagmiProvider')
-  }
 
   const memecoin = useMemo(
     () =>
       new MemecoinSDK({
         walletClient,
-        rpcUrl
+        rpcUrl,
+        apiBaseUrl
       }),
     [walletClient, rpcUrl]
   )

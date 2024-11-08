@@ -1,18 +1,24 @@
 import { MemecoinSDK } from '@/Memecoin'
 import { EthAddressSchema, HexStringSchema } from '@/types'
-import { parseEther } from 'viem'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { createWalletClient, http, parseEther } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
+import { describe, expect, it } from 'vitest'
 
 describe('Memecoin', () => {
-  let sdk: MemecoinSDK
   const TGOAT = EthAddressSchema.parse('0x0b6739e7cb1a7f71a38d7a0c888ec60fcc50faec')
   const MEME = EthAddressSchema.parse('0xb928e5905872bda993a4ac054e1d129e658fadbd')
 
-  beforeEach(async () => {
-    sdk = new MemecoinSDK({
-      privateKey: HexStringSchema.parse(''),
-      rpcUrl: 'https://base-mainnet.g.alchemy.com/v2/demo'
-    })
+  const RPC_URL = 'https://base-mainnet.g.alchemy.com/v2/demo'
+  const PRIVATE_KEY = HexStringSchema.parse('')
+
+  const walletClient = createWalletClient({
+    account: privateKeyToAccount(PRIVATE_KEY),
+    transport: http(RPC_URL)
+  })
+
+  const sdk = new MemecoinSDK({
+    walletClient,
+    rpcUrl: RPC_URL
   })
 
   it.skip('should get a coin by id', async () => {
@@ -84,7 +90,9 @@ describe('Memecoin', () => {
       amountIn
     })
 
-    const allowance = await sdk.getERC20Allowance(coin.contractAddress, coin.memePool)
+    const address = walletClient.account.address
+
+    const allowance = await sdk.getERC20Allowance(coin.contractAddress, coin.memePool, address)
 
     await sdk.sell({
       coin,
@@ -130,7 +138,9 @@ describe('Memecoin', () => {
 
     const pair = await sdk.getPair(coin)
 
-    const allowance = await sdk.getERC20Allowance(coin.contractAddress, coin.memePool)
+    const address = walletClient.account.address
+
+    const allowance = await sdk.getERC20Allowance(coin.contractAddress, coin.memePool, address)
 
     await sdk.sell({
       coin,

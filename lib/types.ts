@@ -78,10 +78,11 @@ export type GenerateMemecoinFromPhraseResponse = z.infer<
   typeof GenerateMemecoinFromPhraseResponseSchema
 >
 
-export const HydratedCoinSchema = z.object({
+export const CoinSchema = z.object({
+  id: z.number(),
   createdAt: z.preprocess((arg) => (typeof arg === 'string' ? new Date(arg) : arg), z.date()),
   contractAddress: EthAddressSchema,
-  dexInitiated: z.boolean(),
+  dexInitiated: z.boolean().nullable(),
   dexInitiatedBlock: z
     .string()
     .transform((arg) => BigInt(arg))
@@ -94,29 +95,60 @@ export const HydratedCoinSchema = z.object({
   memeStorage: EthAddressSchema,
   totalSupply: z.string().transform((arg) => BigInt(arg)),
   marketCap: z.string().transform((value) => BigInt(value)),
-  creatorUsername: z.string().optional(),
-  creatorImage: z.string().optional(),
   name: z.string(),
   ticker: z.string(),
   description: z.string()
 })
 
+export type Coin = z.infer<typeof CoinSchema>
+
+export const UserSchema = z.object({
+  id: z.number(),
+  address: EthAddressSchema,
+  username: z.string(),
+  bio: z.string().nullable(),
+  image: z.string().nullable()
+})
+
+export type User = z.infer<typeof UserSchema>
+
+export const HolderSchema = z.object({
+  accountAddress: EthAddressSchema,
+  coinId: z.number(),
+  balance: z.string().transform((arg) => BigInt(arg)),
+  lockedDays: z.number().optional().nullable(),
+  lockStartDate: z
+    .preprocess((arg) => (typeof arg === 'string' ? new Date(arg) : arg), z.date())
+    .optional()
+    .nullable()
+})
+
+export type Holder = z.infer<typeof HolderSchema>
+
+export const HydratedCoinSchema = CoinSchema.extend({
+  marketCap: z.string().transform((value) => BigInt(value)),
+  user: UserSchema.optional().nullable(),
+  holder: HolderSchema.optional().nullable()
+})
+
 export type HydratedCoin = z.infer<typeof HydratedCoinSchema>
 
-export type TradeParams = {
+export type TradeSellParams = {
   coin: HydratedCoin
   using: 'eth'
   amountIn: bigint
   amountOut: bigint
+  allowance: bigint
   slippage?: number
   affiliate?: EthAddress
   pair?: Pair
-  allowance?: bigint
   lockingDays?: number
   capabilities?: WalletCapabilitiesRecord<WalletCapabilities, number>
 }
 
-export type EstimateTradeParams = Omit<TradeParams, 'amountOut'>
+export type TradeBuyParams = Omit<TradeSellParams, 'allowance'>
+
+export type EstimateTradeParams = Omit<TradeSellParams, 'amountOut' | 'allowance'>
 
 export type BuyManyParams = {
   memeCoins: HydratedCoin[]
