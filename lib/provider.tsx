@@ -14,6 +14,7 @@ import {
 import { Pair } from '@uniswap/v2-sdk'
 import { createContext, ReactNode, useContext, useMemo } from 'react'
 import { useWalletClient } from 'wagmi'
+import { useCapabilities } from 'wagmi/experimental'
 
 interface MemecoinContextType {
   getCoin: (id: EthAddress | number) => Promise<HydratedCoin>
@@ -54,15 +55,17 @@ export const MemecoinProvider = ({
   apiBaseUrl
 }: MemecoinProviderProps): ReactNode => {
   const { data: walletClient } = useWalletClient()
+  const { data: capabilities } = useCapabilities()
 
   const memecoin = useMemo(
     () =>
       new MemecoinSDK({
         walletClient,
         rpcUrl,
-        apiBaseUrl
+        apiBaseUrl,
+        capabilities
       }),
-    [walletClient, rpcUrl]
+    [walletClient, rpcUrl, capabilities]
   )
 
   const contextValue = useMemo(

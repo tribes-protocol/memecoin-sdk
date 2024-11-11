@@ -53,7 +53,9 @@ export class MemecoinSDK {
   private readonly apiBaseUrl: string
   private readonly publicClient: PublicClient
   private readonly walletClient: WalletClient | undefined
-  private teamFee: Promise<bigint>
+  private teamFee: bigint | undefined
+  private teamFeeInterval: NodeJS.Timeout | undefined
+  private capabilities: WalletCapabilitiesRecord<WalletCapabilities, number> | undefined
 
   constructor(config: MemecoinSDKConfig) {
     this.rpcUrl = config.rpcUrl
@@ -65,7 +67,42 @@ export class MemecoinSDK {
     }) as PublicClient
 
     this.walletClient = config.walletClient
-    this.teamFee = this.getTeamFee()
+    this.capabilities = config.capabilities
+
+    this.fetchTeamFee().catch(console.error)
+    this.teamFeeInterval = setInterval(() => this.fetchTeamFee(), 15 * 60 * 1000)
+  }
+
+  destroy(): void {
+    if (this.teamFeeInterval) {
+      clearInterval(this.teamFeeInterval)
+    }
+  }
+
+  private async fetchTeamFee(): Promise<void> {
+    try {
+      const response = await fetch(`${this.apiBaseUrl}/api/coins/get-team-fee`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ memeDeployer: CURRENT_MEME_INFO.DEPLOYER })
+      })
+      const data = await response.json()
+      this.teamFee = BigInt(data)
+    } catch (error) {
+      console.error('Failed to fetch team fee:', error)
+    }
+  }
+
+  private async getTeamFee(): Promise<bigint> {
+    if (!this.teamFee) {
+      await this.fetchTeamFee()
+    }
+    if (!this.teamFee) {
+      throw new Error('Failed to get team fee')
+    }
+    return this.teamFee
   }
 
   private getWalletClient(): WalletClient {
@@ -133,7 +170,7 @@ export class MemecoinSDK {
   }
 
   private async buyFromUniswap(params: TradeBuyParams): Promise<HexString> {
-    const { coin, amountIn: ethAmount, slippage, pair, capabilities } = params
+    const { coin, amountIn: ethAmount, slippage, pair } = params
 
     const walletClient = this.getWalletClient()
     const token = new Token(ChainId.BASE, coin.contractAddress, 18)
@@ -180,7 +217,7 @@ export class MemecoinSDK {
       chain: base
     }
 
-    const batchSupported = isBatchSupported(capabilities)
+    const batchSupported = isBatchSupported(this.capabilities)
 
     const tx = batchSupported
       ? await walletClient.sendTransaction(txParams)
@@ -200,7 +237,7 @@ export class MemecoinSDK {
   private async buyFromMemecoin(params: TradeBuyParams, memePool: EthAddress): Promise<HexString> {
     const walletClient = this.getWalletClient()
 
-    const { coin, amountIn, amountOut, affiliate, slippage, lockingDays, capabilities } = params
+    const { coin, amountIn, amountOut, affiliate, slippage, lockingDays } = params
 
     const minTokens = this.calculateMinAmountWithSlippage(amountOut, slippage)
 
@@ -218,7 +255,7 @@ export class MemecoinSDK {
       BigInt(lockingDays ?? 0)
     ]
 
-    const batchSupported = isBatchSupported(capabilities)
+    const batchSupported = isBatchSupported(this.capabilities)
 
     const data = encodeFunctionData({
       abi,
@@ -252,8 +289,7 @@ export class MemecoinSDK {
   async buyManyMemecoins(params: BuyManyParams): Promise<HexString> {
     const walletClient = this.getWalletClient()
 
-    const { memeCoins, ethAmounts, expectedTokensAmounts, affiliate, lockingDays, capabilities } =
-      params
+    const { memeCoins, ethAmounts, expectedTokensAmounts, affiliate, lockingDays } = params
 
     const minTokensAmounts = expectedTokensAmounts.map((amount) =>
       this.calculateMinAmountWithSlippage(amount)
@@ -294,7 +330,7 @@ export class MemecoinSDK {
       chain: base
     }
 
-    const batchSupported = isBatchSupported(capabilities)
+    const batchSupported = isBatchSupported(this.capabilities)
 
     const tx = batchSupported
       ? await walletClient.sendTransaction(txParams)
@@ -344,15 +380,7 @@ export class MemecoinSDK {
   }
 
   private async sellFromUniswap(params: TradeSellParams): Promise<HexString> {
-    const {
-      coin,
-      amountIn: tokenAmount,
-      amountOut,
-      slippage,
-      pair,
-      allowance,
-      capabilities
-    } = params
+    const { coin, amountIn: tokenAmount, amountOut, slippage, pair, allowance } = params
 
     const walletClient = this.getWalletClient()
 
@@ -418,7 +446,7 @@ export class MemecoinSDK {
 
     let batchSupported = false
     try {
-      batchSupported = isBatchSupported(capabilities)
+      batchSupported = isBatchSupported(this.capabilities)
     } catch {
       batchSupported = false
     }
@@ -681,7 +709,7 @@ export class MemecoinSDK {
   async launch(params: LaunchCoinParams): Promise<[EthAddress, HexString]> {
     const walletClient = this.getWalletClient()
 
-    const teamFee = await this.teamFee
+    const teamFee = await this.getTeamFee()
 
     const {
       antiSnipeAmount,
@@ -764,18 +792,6 @@ export class MemecoinSDK {
     }
 
     return [contractAddress, tx]
-  }
-
-  private async getTeamFee(): Promise<bigint> {
-    const response = await fetch(`${this.apiBaseUrl}/api/coins/get-team-fee`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ memeDeployer: CURRENT_MEME_INFO.DEPLOYER })
-    })
-    const data = await response.json()
-    return BigInt(data)
   }
 
   private calculateMinAmountWithSlippage(amount: bigint, slippagePercentage: number = 5): bigint {

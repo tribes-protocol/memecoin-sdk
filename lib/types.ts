@@ -24,6 +24,7 @@ export interface MemecoinSDKConfig {
   rpcUrl: string
   apiBaseUrl?: string
   walletClient?: WalletClient
+  capabilities?: WalletCapabilitiesRecord<WalletCapabilities, number>
 }
 
 export interface LaunchCoinParams {
@@ -146,7 +147,6 @@ export type TradeSellParams = {
   affiliate?: EthAddress
   pair?: Pair
   lockingDays?: number
-  capabilities?: WalletCapabilitiesRecord<WalletCapabilities, number>
 }
 
 export type TradeBuyParams = Omit<TradeSellParams, 'allowance'>
@@ -159,5 +159,4 @@ export type BuyManyParams = {
   expectedTokensAmounts: bigint[]
   affiliate?: EthAddress
   lockingDays?: number
-  capabilities?: WalletCapabilitiesRecord<WalletCapabilities, number>
 }
