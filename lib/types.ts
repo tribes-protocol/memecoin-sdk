@@ -164,3 +164,52 @@ export interface EstimateTradeParams {
   using: 'eth'
   amountIn: bigint
 }
+
+export interface EstimateSwapCoinParams {
+  fromToken: HydratedCoin
+  toToken: HydratedCoin
+  amountIn: bigint
+}
+
+export type EstimateSwapParams =
+  | {
+      fromToken: HydratedCoin
+      toToken: HydratedCoin | 'eth'
+      amountIn: bigint
+    }
+  | {
+      fromToken: 'eth'
+      toToken: HydratedCoin
+      amountIn: bigint
+    }
+
+export interface SwapCoinParams {
+  fromToken: HydratedCoin
+  toToken: HydratedCoin
+  amountIn: bigint
+  amountOut: bigint
+  allowance: bigint
+  slippage?: number
+  affiliate?: EthAddress
+}
+
+export type SwapParams =
+  | {
+      fromToken: HydratedCoin
+      toToken: HydratedCoin | 'eth'
+      amountIn: bigint
+      amountOut: bigint
+      allowance: bigint
+      slippage?: number
+      affiliate?: EthAddress
+      pair?: Pair
+    }
+  | {
+      fromToken: 'eth'
+      toToken: HydratedCoin
+      amountIn: bigint
+      amountOut: bigint
+      slippage?: number
+      affiliate?: EthAddress
+      pair?: Pair
+    }

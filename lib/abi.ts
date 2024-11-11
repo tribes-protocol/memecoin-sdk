@@ -128,12 +128,5 @@ export const SWAP_MEMECOIN_ABI = [
     ],
     outputs: [],
     stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'transferOwnership',
-    inputs: [{ name: 'newOwner', type: 'address', internalType: 'address' }],
-    outputs: [],
-    stateMutability: 'nonpayable'
   }
 ]
