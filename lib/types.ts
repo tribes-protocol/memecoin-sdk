@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 export const EthAddressSchema = z
   .custom<`0x${string}`>((val): val is `0x${string}` => typeof val === 'string' && isAddress(val))
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   .transform((arg) => arg.toLowerCase() as `0x${string}`)
 
 export type EthAddress = z.infer<typeof EthAddressSchema>
@@ -14,6 +15,7 @@ export const HexStringSchema = z
     const normalized = val.startsWith('0x') ? val : `0x${val}`
     return /^0x[a-fA-F0-9]+$/.test(normalized)
   })
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   .transform((val) => (val.startsWith('0x') ? val : (`0x${val}` as `0x${string}`)))
 
 export type HexString = z.infer<typeof HexStringSchema>

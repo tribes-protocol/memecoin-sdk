@@ -98,6 +98,12 @@
     "prettier/prettier": "error",
     "no-async-promise-executor": "off",
     "space-before-function-paren": "off",
-    "@typescript-eslint/no-unsafe-member-access": "error"
+    "@typescript-eslint/no-unsafe-member-access": "error",
+    "@typescript-eslint/consistent-type-assertions": [
+      "error",
+      {
+        "assertionStyle": "never"
+      }
+    ]
   }
 }

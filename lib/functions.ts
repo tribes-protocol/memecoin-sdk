@@ -14,6 +14,7 @@ export function isNull(obj: any): obj is null | undefined {
 }
 
 export function compactMap<T>(array: (T | null | undefined)[]): T[] {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   return array.filter((item) => !isNull(item)) as T[]
 }
 

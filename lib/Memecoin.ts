@@ -9,7 +9,6 @@ import {
   INITIAL_RESERVE,
   INITIAL_SUPPLY,
   isBatchSupported,
-  MEME_V3,
   UNISWAP_V2_ROUTER,
   UNISWAP_V2_ROUTER_PROXY,
   WETH_TOKEN
@@ -59,6 +58,7 @@ export class MemecoinSDK {
   constructor(config: MemecoinSDKConfig) {
     this.rpcUrl = config.rpcUrl
     this.apiBaseUrl = config.apiBaseUrl ?? API_BASE_URL
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     this.publicClient = createPublicClient({
       chain: base,
       transport: http(this.rpcUrl)
@@ -211,10 +211,12 @@ export class MemecoinSDK {
 
     const abi = getBuyTokensABI(memePool)
 
-    const args = [coin.contractAddress, minTokens, affiliate ?? CURRENT_MEME_INFO.FEE_COLLECTOR]
-    if (memePool === MEME_V3.POOL) {
-      args.push(BigInt(lockingDays ?? 0)) // Locking days
-    }
+    const args = [
+      coin.contractAddress,
+      minTokens,
+      affiliate ?? CURRENT_MEME_INFO.FEE_COLLECTOR,
+      BigInt(lockingDays ?? 0)
+    ]
 
     const batchSupported = isBatchSupported(capabilities)
 
@@ -274,12 +276,9 @@ export class MemecoinSDK {
       memeCoins.map((coin) => coin.contractAddress),
       minTokensAmounts,
       ethAmounts,
-      affiliate ?? FEE_COLLECTOR
+      affiliate ?? FEE_COLLECTOR,
+      BigInt(lockingDays ?? 0)
     ]
-    if (memePool === MEME_V3.POOL) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      args.push(BigInt(lockingDays ?? 0) as any) // Locking days
-    }
 
     const data = encodeFunctionData({
       abi,
@@ -398,6 +397,7 @@ export class MemecoinSDK {
     const fee = (amountOut * 17n) / 1000n // 1.7% fee
 
     const swapContractCall = {
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       abi: SWAP_EXACT_TOKENS_FOR_ETH_ABI as Abi,
       address: UNISWAP_V2_ROUTER_PROXY,
       functionName: 'swapExactTokensForETH',
@@ -527,8 +527,8 @@ export class MemecoinSDK {
       args: [memePool, amountIn]
     } as const
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const abi = getSellTokensABI(memePool) as any
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    const abi = getSellTokensABI(memePool) as Abi
 
     const account = walletClient.account
     if (isNull(account)) {
