@@ -16,6 +16,7 @@ import {
 import { encodeOnchainData, isNull, isRequiredNumber, isValidBigIntString } from '@/functions'
 import {
   BuyManyParams,
+  EstimateSwapParams,
   EstimateTradeParams,
   EthAddress,
   EthAddressSchema,
@@ -657,6 +658,30 @@ export class MemecoinSDK {
 
       return receipt.transactionHash
     }
+  }
+
+  async estimateSwap(params: EstimateSwapParams): Promise<bigint> {
+    const { fromToken, toToken, amountIn } = params
+
+    const response = await fetch(`${this.apiBaseUrl}/api/trades/estimate-swap`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fromToken,
+        toToken,
+        amountIn: amountIn.toString()
+      })
+    })
+
+    const result = await response.json()
+
+    if (!isValidBigIntString(result)) {
+      throw new Error('Invalid response format')
+    }
+
+    return BigInt(result)
   }
 
   async getPair(coin: HydratedCoin): Promise<Pair> {

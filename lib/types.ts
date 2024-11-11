@@ -139,7 +139,7 @@ export type HydratedCoin = z.infer<typeof HydratedCoinSchema>
 
 export type TradeSellParams = {
   coin: HydratedCoin
-  using: 'eth'
+  using: 'eth' | EthAddress
   amountIn: bigint
   amountOut: bigint
   allowance: bigint
@@ -159,4 +159,10 @@ export type BuyManyParams = {
   expectedTokensAmounts: bigint[]
   affiliate?: EthAddress
   lockingDays?: number
+}
+
+export type EstimateSwapParams = {
+  fromToken: EthAddress
+  toToken: EthAddress
+  amountIn: bigint
 }
