@@ -40,7 +40,7 @@ const walletClient = createWalletClient({
 
 const sdk = new MemecoinSDK({
   rpcUrl: 'https://base-mainnet.g.alchemy.com/v2/demo',
-  walletClient // Optional for backend usage
+  walletClient // Optional, only needed for write operations
 })
 ```
 
@@ -106,15 +106,7 @@ const transactionHash = await sdk.sell({
 })
 ```
 
-### Generate and Launch a Coin
-
-Generate a new token based on a prompt:
-
-```typescript
-const generatedCoin = await sdk.generateCoin({
-  prompt: 'A meme-based coin with a unique twist.'
-})
-```
+### Launch a Coin
 
 Launch a newly generated token:
 
@@ -124,8 +116,7 @@ const [contractAddress, txHash] = await sdk.launch({
   ticker: 'NMEME',
   antiSnipeAmount: BigInt(1000000000000000),
   image: 'https://example.com/image.png',
-  website: 'https://example.com',
-  teamFee: BigInt(5000000000000000)
+  website: 'https://example.com'
 })
 ```
 
@@ -203,22 +194,6 @@ function BuyCoin({ coinId }) {
 ## Testing
 
 The SDK includes `vitest` tests to validate its functionality. Each test is configured with specific conditions and uses mock data.
-
-### Running Tests
-
-Execute tests with the following command:
-
-```bash
-npm run test
-```
-
-### Example Tests
-
-- **Coin Fetching:** Checks if a coin can be fetched by ID.
-- **Trending Coins:** Validates if trending coins are retrieved correctly.
-- **Buy and Sell Transactions:** Tests both Uniswap and memepool transactions to ensure they complete successfully.
-
----
 
 ## API Reference
 
