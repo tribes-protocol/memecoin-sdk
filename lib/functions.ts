@@ -1,3 +1,5 @@
+import { OnchainData } from '@/types'
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function ensureString(value: any, message: string | undefined = undefined): string {
   if (!value) {
@@ -51,4 +53,16 @@ export function isValidBigIntString(str: any): boolean {
   } catch (e) {
     return false
   }
+}
+
+export function encodeOnchainData(data: OnchainData): string {
+  const separator = '@@@'
+  return [
+    data.image,
+    data.website,
+    data.twitter,
+    data.telegram,
+    data.discord,
+    data.description
+  ].join(separator)
 }

@@ -2,7 +2,6 @@ import { SWAP_EXACT_ETH_FOR_TOKENS_ABI, SWAP_EXACT_TOKENS_FOR_ETH_ABI } from '@/
 import {
   API_BASE_URL,
   CURRENT_MEME_INFO,
-  encodeOnchainData,
   getBuyManyTokensABI,
   getBuyTokensABI,
   getCreateMemeABI,
@@ -15,19 +14,17 @@ import {
   UNISWAP_V2_ROUTER_PROXY,
   WETH_TOKEN
 } from '@/constants'
-import { isNull, isRequiredNumber, isValidBigIntString } from '@/functions'
+import { encodeOnchainData, isNull, isRequiredNumber, isValidBigIntString } from '@/functions'
 import {
   BuyManyParams,
   EstimateTradeParams,
   EthAddress,
   EthAddressSchema,
-  GenerateCoinParams,
-  GenerateMemecoinFromPhraseResponse,
-  GenerateMemecoinFromPhraseResponseSchema,
   HexString,
   HydratedCoin,
   HydratedCoinSchema,
   LaunchCoinParams,
+  MemecoinSDKConfig,
   TradeBuyParams,
   TradeSellParams
 } from '@/types'
@@ -46,16 +43,9 @@ import {
   WalletClient
 } from 'viem'
 import { base } from 'viem/chains'
-import { eip5792Actions, getCapabilities, writeContracts } from 'viem/experimental'
+import { eip5792Actions, writeContracts } from 'viem/experimental'
 
 const FEE_COLLECTOR = CURRENT_MEME_INFO.FEE_COLLECTOR
-
-export type MemecoinSDKConfig = {
-  rpcUrl: string
-  apiBaseUrl?: string
-  walletClient?: WalletClient
-  privateKey?: HexString // for backend
-}
 
 const slippageTolerance = new Percent('500', '10000')
 
@@ -64,6 +54,7 @@ export class MemecoinSDK {
   private readonly apiBaseUrl: string
   private readonly publicClient: PublicClient
   private readonly walletClient: WalletClient | undefined
+  private teamFee: Promise<bigint>
 
   constructor(config: MemecoinSDKConfig) {
     this.rpcUrl = config.rpcUrl
@@ -74,11 +65,12 @@ export class MemecoinSDK {
     }) as PublicClient
 
     this.walletClient = config.walletClient
+    this.teamFee = this.getTeamFee()
   }
 
   private getWalletClient(): WalletClient {
     if (isNull(this.walletClient)) {
-      throw new Error('Read only mode, pass a private key or use under wagmi provider')
+      throw new Error('Read only mode, pass a wallet client for write operations')
     }
     return this.walletClient
   }
@@ -686,17 +678,10 @@ export class MemecoinSDK {
     return pair
   }
 
-  async generateCoin(params: GenerateCoinParams): Promise<GenerateMemecoinFromPhraseResponse> {
-    const response = await fetch(`${this.apiBaseUrl}/api/coins/generate`, {
-      method: 'POST',
-      body: JSON.stringify(params)
-    })
-    const data = GenerateMemecoinFromPhraseResponseSchema.parse(await response.json())
-    return data
-  }
-
   async launch(params: LaunchCoinParams): Promise<[EthAddress, HexString]> {
     const walletClient = this.getWalletClient()
+
+    const teamFee = await this.teamFee
 
     const {
       antiSnipeAmount,
@@ -708,7 +693,6 @@ export class MemecoinSDK {
       twitter,
       telegram,
       discord,
-      teamFee,
       lockingDays
     } = params
 
@@ -782,7 +766,7 @@ export class MemecoinSDK {
     return [contractAddress, tx]
   }
 
-  async getTeamFee(): Promise<bigint> {
+  private async getTeamFee(): Promise<bigint> {
     const response = await fetch(`${this.apiBaseUrl}/api/coins/get-team-fee`, {
       method: 'POST',
       headers: {
@@ -792,11 +776,6 @@ export class MemecoinSDK {
     })
     const data = await response.json()
     return BigInt(data)
-  }
-
-  async getCapabilities(): Promise<WalletCapabilitiesRecord<WalletCapabilities, number>> {
-    const walletClient = this.getWalletClient()
-    return await getCapabilities(walletClient)
   }
 
   private calculateMinAmountWithSlippage(amount: bigint, slippagePercentage: number = 5): bigint {

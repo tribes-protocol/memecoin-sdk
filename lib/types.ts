@@ -1,5 +1,5 @@
 import { Pair } from '@uniswap/v2-sdk'
-import { isAddress, WalletCapabilities, WalletCapabilitiesRecord } from 'viem'
+import { isAddress, WalletCapabilities, WalletCapabilitiesRecord, WalletClient } from 'viem'
 import { z } from 'zod'
 
 export const EthAddressSchema = z
@@ -18,11 +18,13 @@ export const HexStringSchema = z
 
 export type HexString = z.infer<typeof HexStringSchema>
 
-export type GenerateCoinParams = {
-  prompt: string
+export interface MemecoinSDKConfig {
+  rpcUrl: string
+  apiBaseUrl?: string
+  walletClient?: WalletClient
 }
 
-export type LaunchCoinParams = {
+export interface LaunchCoinParams {
   name: string
   ticker: string
   antiSnipeAmount: bigint
@@ -32,7 +34,6 @@ export type LaunchCoinParams = {
   telegram: string
   discord: string
   description: string
-  teamFee: bigint
   lockingDays?: number
 }
 

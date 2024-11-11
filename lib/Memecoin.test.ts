@@ -21,7 +21,7 @@ describe('Memecoin', () => {
     rpcUrl: RPC_URL
   })
 
-  it.skip('should get a coin by id', async () => {
+  it('should get a coin by id', async () => {
     const coin = await sdk.getCoin(1)
 
     expect(coin).toBeDefined()
@@ -30,7 +30,7 @@ describe('Memecoin', () => {
     expect(coin.marketCap).toBeDefined()
   })
 
-  it.skip('should get trending coins', async () => {
+  it('should get trending coins', async () => {
     const coins = await sdk.getTrending()
 
     expect(coins.length).toBe(12)

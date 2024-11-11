@@ -5,8 +5,6 @@ import {
   BuyManyParams,
   EstimateTradeParams,
   EthAddress,
-  GenerateCoinParams,
-  GenerateMemecoinFromPhraseResponse,
   HexString,
   HydratedCoin,
   LaunchCoinParams,
@@ -25,9 +23,7 @@ interface MemecoinContextType {
   buy: (params: TradeBuyParams) => Promise<HexString>
   sell: (params: TradeSellParams) => Promise<HexString>
   buyMany: (params: BuyManyParams) => Promise<HexString>
-  generateCoin: (params: GenerateCoinParams) => Promise<GenerateMemecoinFromPhraseResponse>
   launchCoin: (params: LaunchCoinParams) => Promise<[EthAddress, HexString]>
-  getTeamFee: () => Promise<bigint>
   getPair: (coin: HydratedCoin) => Promise<Pair>
   getERC20Allowance: (
     tokenAddress: EthAddress,
@@ -77,9 +73,7 @@ export const MemecoinProvider = ({
       estimateSell: memecoin.estimateSell.bind(memecoin),
       buy: memecoin.buy.bind(memecoin),
       sell: memecoin.sell.bind(memecoin),
-      generateCoin: memecoin.generateCoin.bind(memecoin),
       launchCoin: memecoin.launch.bind(memecoin),
-      getTeamFee: memecoin.getTeamFee.bind(memecoin),
       getPair: memecoin.getPair.bind(memecoin),
       getERC20Allowance: memecoin.getERC20Allowance.bind(memecoin),
       buyMany: memecoin.buyManyMemecoins.bind(memecoin)
