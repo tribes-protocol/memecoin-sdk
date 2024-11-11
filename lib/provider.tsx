@@ -3,13 +3,12 @@
 import { MemecoinSDK } from '@/Memecoin'
 import {
   BuyManyParams,
-  EstimateTradeParams,
+  EstimateSwapParams,
   EthAddress,
   HexString,
   HydratedCoin,
   LaunchCoinParams,
-  TradeBuyParams,
-  TradeSellParams
+  SwapParams
 } from '@/types'
 import { Pair } from '@uniswap/v2-sdk'
 import { createContext, ReactNode, useContext, useMemo } from 'react'
@@ -19,10 +18,8 @@ import { useCapabilities } from 'wagmi/experimental'
 interface MemecoinContextType {
   getCoin: (id: EthAddress | number) => Promise<HydratedCoin>
   getTrending: () => Promise<HydratedCoin[]>
-  estimateBuy: (params: EstimateTradeParams) => Promise<bigint>
-  estimateSell: (params: EstimateTradeParams) => Promise<bigint>
-  buy: (params: TradeBuyParams) => Promise<HexString>
-  sell: (params: TradeSellParams) => Promise<HexString>
+  estimateSwap: (params: EstimateSwapParams) => Promise<bigint>
+  swap: (params: SwapParams) => Promise<HexString>
   buyMany: (params: BuyManyParams) => Promise<HexString>
   launchCoin: (params: LaunchCoinParams) => Promise<[EthAddress, HexString]>
   getPair: (coin: HydratedCoin) => Promise<Pair>
@@ -72,10 +69,8 @@ export const MemecoinProvider = ({
     () => ({
       getCoin: memecoin.getCoin.bind(memecoin),
       getTrending: memecoin.getTrending.bind(memecoin),
-      estimateBuy: memecoin.estimateBuy.bind(memecoin),
-      estimateSell: memecoin.estimateSell.bind(memecoin),
-      buy: memecoin.buy.bind(memecoin),
-      sell: memecoin.sell.bind(memecoin),
+      estimateSwap: memecoin.estimateSwap.bind(memecoin),
+      swap: memecoin.swap.bind(memecoin),
       launchCoin: memecoin.launch.bind(memecoin),
       getPair: memecoin.getPair.bind(memecoin),
       getERC20Allowance: memecoin.getERC20Allowance.bind(memecoin),
