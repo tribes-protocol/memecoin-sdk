@@ -137,7 +137,7 @@ export const HydratedCoinSchema = CoinSchema.extend({
 
 export type HydratedCoin = z.infer<typeof HydratedCoinSchema>
 
-export type TradeSellParams = {
+export interface TradeSellParams {
   coin: HydratedCoin
   using: 'eth' | EthAddress
   amountIn: bigint
@@ -151,9 +151,7 @@ export type TradeSellParams = {
 
 export type TradeBuyParams = Omit<TradeSellParams, 'allowance'>
 
-export type EstimateTradeParams = Omit<TradeSellParams, 'amountOut' | 'allowance'>
-
-export type BuyManyParams = {
+export interface BuyManyParams {
   memeCoins: HydratedCoin[]
   ethAmounts: bigint[]
   expectedTokensAmounts: bigint[]
@@ -161,8 +159,8 @@ export type BuyManyParams = {
   lockingDays?: number
 }
 
-export type EstimateSwapParams = {
-  fromToken: EthAddress
-  toToken: EthAddress
+export interface EstimateTradeParams {
+  coin: HydratedCoin
+  using: 'eth'
   amountIn: bigint
 }
