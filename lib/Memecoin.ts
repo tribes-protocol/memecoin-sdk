@@ -67,8 +67,8 @@ export class MemecoinSDK {
   private readonly apiBaseUrl: string
   private readonly publicClient: PublicClient
   private readonly walletClient: Promise<WalletClient>
-  private teamFee: Promise<bigint>
-  private teamFeeInterval: NodeJS.Timeout | undefined
+  private teamFee: Promise<bigint> = Promise.resolve(200000000000000n)
+  private teamFeeInterval: NodeJS.Timeout
   private capabilities: Promise<WalletCapabilitiesRecord<WalletCapabilities, number>> | undefined
 
   constructor(config: MemecoinSDKConfig) {
@@ -100,18 +100,20 @@ export class MemecoinSDK {
       this.capabilities = getCapabilities(config.walletClient)
     }
 
-    this.teamFee = this.fetchTeamFee()
-    this.teamFeeInterval = setInterval(
-      async () => {
-        this.teamFee = this.fetchTeamFee()
-      },
-      15 * 60 * 1000
-    )
+    void this.refreshTeamFee()
+    this.teamFeeInterval = setInterval(() => this.refreshTeamFee(), 15 * 60 * 1000)
   }
 
   destroy(): void {
-    if (this.teamFeeInterval) {
-      clearInterval(this.teamFeeInterval)
+    clearInterval(this.teamFeeInterval)
+  }
+
+  private async refreshTeamFee(): Promise<void> {
+    try {
+      const fee = await this.fetchTeamFee()
+      this.teamFee = Promise.resolve(fee)
+    } catch (e) {
+      console.warn('Error fetching team fee', e)
     }
   }
 
@@ -184,7 +186,7 @@ export class MemecoinSDK {
       if (params.coin.dexInitiated) {
         return this.buyFromUniswap(params)
       } else {
-        return this.buyFromMemecoin(params, params.coin.memePool)
+        return this.buyFromMemecoin(params)
       }
     } else {
       const [coin, amountOut] = await Promise.all([
@@ -205,7 +207,7 @@ export class MemecoinSDK {
           pair
         })
       } else {
-        return this.buyFromMemecoin({ ...params, coin, amountOut }, coin.memePool)
+        return this.buyFromMemecoin({ ...params, coin, amountOut })
       }
     }
   }
@@ -281,10 +283,7 @@ export class MemecoinSDK {
     return receipt.transactionHash
   }
 
-  private async buyFromMemecoin(
-    params: BuyFrontendParams,
-    memePool: EthAddress
-  ): Promise<HexString> {
+  private async buyFromMemecoin(params: BuyFrontendParams): Promise<HexString> {
     const walletClient = await this.walletClient
 
     const { coin, amountIn, amountOut, affiliate, slippage, lockingDays } = params
@@ -296,7 +295,7 @@ export class MemecoinSDK {
       throw new Error('No account found')
     }
 
-    const abi = getBuyTokensABI(memePool)
+    const abi = getBuyTokensABI(coin.memePool)
 
     const args = [
       coin.contractAddress,
@@ -320,7 +319,7 @@ export class MemecoinSDK {
     })
 
     const txParams = {
-      to: memePool,
+      to: coin.memePool,
       data,
       value: amountIn,
       account,
@@ -449,7 +448,7 @@ export class MemecoinSDK {
       if (params.coin.dexInitiated) {
         return this.sellFromUniswap(params)
       } else {
-        return this.sellFromMemecoin(params, params.coin.memePool)
+        return this.sellFromMemecoin(params)
       }
     } else {
       const [coin, amountOut] = await Promise.all([
@@ -480,7 +479,7 @@ export class MemecoinSDK {
           allowance
         })
       } else {
-        return this.sellFromMemecoin({ ...params, coin, amountOut, allowance }, coin.memePool)
+        return this.sellFromMemecoin({ ...params, coin, amountOut, allowance })
       }
     }
   }
@@ -644,10 +643,7 @@ export class MemecoinSDK {
     }
   }
 
-  private async sellFromMemecoin(
-    params: SellFrontendParams,
-    memePool: EthAddress
-  ): Promise<HexString> {
+  private async sellFromMemecoin(params: SellFrontendParams): Promise<HexString> {
     const { coin, amountIn, amountOut, affiliate, slippage, allowance } = params
 
     const walletClient = await this.walletClient
@@ -658,11 +654,11 @@ export class MemecoinSDK {
       address: coin.contractAddress,
       abi: erc20Abi,
       functionName: 'approve',
-      args: [memePool, amountIn]
+      args: [coin.memePool, amountIn]
     } as const
 
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    const abi = getSellTokensABI(memePool) as Abi
+    const abi = getSellTokensABI(coin.memePool) as Abi
 
     const account = walletClient.account
     if (isNull(account)) {
@@ -674,7 +670,7 @@ export class MemecoinSDK {
     }
 
     const sellContractCall = {
-      address: memePool,
+      address: coin.memePool,
       abi,
       functionName: 'sellTokens',
       args: [coin.contractAddress, amountIn, minETHAmount, affiliate ?? FEE_COLLECTOR]
@@ -743,7 +739,7 @@ export class MemecoinSDK {
       const data = encodeFunctionData(sellContractCall)
 
       const txParams = {
-        to: memePool,
+        to: coin.memePool,
         data,
         account,
         chain: base
