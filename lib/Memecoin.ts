@@ -65,7 +65,7 @@ export class MemecoinSDK {
   private readonly apiBaseUrl: string
   private readonly publicClient: PublicClient
   private readonly walletClient: WalletClient | undefined
-  private teamFee: Promise<bigint> | undefined
+  private teamFee: Promise<bigint>
   private teamFeeInterval: NodeJS.Timeout | undefined
   private capabilities: Promise<WalletCapabilitiesRecord<WalletCapabilities, number>> | undefined
 
@@ -122,16 +122,6 @@ export class MemecoinSDK {
     }
 
     return BigInt(data)
-  }
-
-  private async getTeamFee(): Promise<bigint> {
-    if (!this.teamFee) {
-      await this.fetchTeamFee()
-    }
-    if (!this.teamFee) {
-      throw new Error('Failed to get team fee')
-    }
-    return this.teamFee
   }
 
   private getWalletClient(): WalletClient {
@@ -954,7 +944,7 @@ export class MemecoinSDK {
   async launch(params: LaunchCoinParams): Promise<LaunchCoinResponse> {
     const walletClient = this.getWalletClient()
 
-    const teamFee = await this.getTeamFee()
+    const teamFee = await this.teamFee
 
     const {
       antiSnipeAmount,
