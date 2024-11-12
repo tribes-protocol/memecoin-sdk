@@ -1,31 +1,32 @@
 'use client'
 
+import { getPair } from '@/functions'
 import { MemecoinSDK } from '@/Memecoin'
 import {
   BuyManyParams,
+  BuyParams,
   EstimateTradeParams,
   EthAddress,
   HexString,
   HydratedCoin,
   LaunchCoinParams,
   LaunchCoinResponse,
-  TradeBuyParams,
-  TradeSellParams
+  SellParams
 } from '@/types'
 import { Pair } from '@uniswap/v2-sdk'
-import { createContext, ReactNode, useContext, useMemo } from 'react'
-import { useWalletClient } from 'wagmi'
+import { createContext, ReactNode, useCallback, useContext, useMemo } from 'react'
+import { usePublicClient, useWalletClient } from 'wagmi'
 
 interface MemecoinContextType {
   getCoin: (id: EthAddress | number) => Promise<HydratedCoin>
   getTrending: () => Promise<HydratedCoin[]>
   estimateBuy: (params: EstimateTradeParams) => Promise<bigint>
   estimateSell: (params: EstimateTradeParams) => Promise<bigint>
-  buy: (params: TradeBuyParams) => Promise<HexString>
-  sell: (params: TradeSellParams) => Promise<HexString>
+  buy: (params: BuyParams) => Promise<HexString>
+  sell: (params: SellParams) => Promise<HexString>
   buyMany: (params: BuyManyParams) => Promise<HexString>
   launchCoin: (params: LaunchCoinParams) => Promise<LaunchCoinResponse>
-  getPair: (coin: HydratedCoin) => Promise<Pair>
+  getPair: (coin: EthAddress) => Promise<Pair>
   getERC20Allowance: (
     tokenAddress: EthAddress,
     spenderAddress: EthAddress,
@@ -55,6 +56,7 @@ export const MemecoinProvider = ({
   apiBaseUrl
 }: MemecoinProviderProps): ReactNode => {
   const { data: walletClient } = useWalletClient()
+  const publicClient = usePublicClient()
 
   const memecoin = useMemo(
     () =>
@@ -66,6 +68,11 @@ export const MemecoinProvider = ({
     [walletClient, rpcUrl]
   )
 
+  const getUniswapPair = useCallback(
+    (coin: EthAddress): Promise<Pair> => getPair(coin, publicClient),
+    [publicClient]
+  )
+
   const contextValue = useMemo(
     () => ({
       getCoin: memecoin.getCoin.bind(memecoin),
@@ -75,11 +82,11 @@ export const MemecoinProvider = ({
       buy: memecoin.buy.bind(memecoin),
       sell: memecoin.sell.bind(memecoin),
       launchCoin: memecoin.launch.bind(memecoin),
-      getPair: memecoin.getPair.bind(memecoin),
+      getPair: getUniswapPair,
       getERC20Allowance: memecoin.getERC20Allowance.bind(memecoin),
       buyMany: memecoin.buyManyMemecoins.bind(memecoin)
     }),
-    [memecoin]
+    [memecoin, getUniswapPair]
   )
 
   return <MemecoinContext.Provider value={contextValue}>{children}</MemecoinContext.Provider>
