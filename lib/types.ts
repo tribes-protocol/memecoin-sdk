@@ -138,7 +138,7 @@ export type SellFrontendParams = {
   pair?: Pair
 }
 
-export type SwapBackendParams = {
+export type SellBackendParams = {
   coin: EthAddress
   using: 'eth'
   amountIn: bigint
@@ -146,7 +146,7 @@ export type SwapBackendParams = {
   affiliate?: EthAddress
 }
 
-export type TradeSellParams = SellFrontendParams | SwapBackendParams
+export type TradeSellParams = SellFrontendParams | SellBackendParams
 
 export function isSellFrontendParams(params: TradeSellParams): params is SellFrontendParams {
   return !isRequiredString(params.coin) && 'amountOut' in params
