@@ -1,3 +1,4 @@
+import { isRequiredString } from '@/functions'
 import { Pair } from '@uniswap/v2-sdk'
 import { isAddress, WalletClient } from 'viem'
 import { z } from 'zod'
@@ -71,27 +72,6 @@ export const OnchainDataSchema = z.object({
 
 export type OnchainData = z.infer<typeof OnchainDataSchema>
 
-export const BasicMemecoinSchema = z.object({
-  name: z.string(),
-  ticker: z.string(),
-  description: z.string()
-})
-
-export const FalGenImageStatusRequestSchema = z.object({
-  requestId: z.string(),
-  model: z.string()
-})
-
-export const GenerateMemecoinFromPhraseResponseSchema = z.object({
-  prompt: z.string(),
-  memecoin: BasicMemecoinSchema,
-  requests: z.array(FalGenImageStatusRequestSchema)
-})
-
-export type GenerateMemecoinFromPhraseResponse = z.infer<
-  typeof GenerateMemecoinFromPhraseResponseSchema
->
-
 export const CoinSchema = z.object({
   id: z.number(),
   createdAt: z.preprocess((arg) => (typeof arg === 'string' ? new Date(arg) : arg), z.date()),
@@ -147,7 +127,7 @@ export const HydratedCoinSchema = CoinSchema.extend({
 
 export type HydratedCoin = z.infer<typeof HydratedCoinSchema>
 
-export interface TradeSellParams {
+export type SellParams = {
   coin: HydratedCoin
   using: 'eth' | EthAddress
   amountIn: bigint
@@ -156,21 +136,70 @@ export interface TradeSellParams {
   slippage?: number
   affiliate?: EthAddress
   pair?: Pair
+}
+
+export type TradeSellParams =
+  | SellParams
+  | {
+      coin: EthAddress
+      using: 'eth'
+      amountIn: bigint
+      slippage?: number
+      affiliate?: EthAddress
+    }
+
+export function isSellParams(params: TradeSellParams): params is SellParams {
+  return !isRequiredString(params.coin) && 'amountOut' in params
+}
+
+export type BuyParams = {
+  coin: HydratedCoin
+  using: 'eth'
+  amountIn: bigint
+  amountOut: bigint
+  slippage?: number
+  affiliate?: EthAddress
+  pair?: Pair
   lockingDays?: number
 }
 
-export type TradeBuyParams = Omit<TradeSellParams, 'allowance'>
+export type TradeBuyParams =
+  | {
+      coin: HydratedCoin
+      using: 'eth'
+      amountIn: bigint
+      amountOut: bigint
+      slippage?: number
+      affiliate?: EthAddress
+      pair?: Pair
+      lockingDays?: number
+    }
+  | {
+      coin: EthAddress
+      using: 'eth'
+      amountIn: bigint
+      slippage?: number
+      affiliate?: EthAddress
+    }
+
+export function isBuyParams(params: TradeBuyParams): params is BuyParams {
+  return !isRequiredString(params.coin) && 'amountOut' in params
+}
 
 export interface BuyManyParams {
-  memeCoins: HydratedCoin[]
+  memeCoins: (EthAddress | HydratedCoin)[]
   ethAmounts: bigint[]
   expectedTokensAmounts: bigint[]
   affiliate?: EthAddress
   lockingDays?: number
 }
 
+export function isBuyManyParams(params: BuyManyParams): params is BuyManyParams {
+  return params.memeCoins.every((coin) => !isRequiredString(coin))
+}
+
 export interface EstimateTradeParams {
-  coin: HydratedCoin
+  coin: EthAddress
   using: 'eth'
   amountIn: bigint
 }

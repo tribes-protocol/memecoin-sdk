@@ -40,11 +40,9 @@ describe('Memecoin', () => {
   })
 
   it('should estimate buy using eth', async () => {
-    const coin = await sdk.getCoin(TGOAT)
-
-    const amountOut = await sdk.estimateSwap({
-      fromToken: 'eth',
-      toToken: coin,
+    const amountOut = await sdk.estimateBuy({
+      coin: TGOAT,
+      using: 'eth',
       amountIn: BigInt(10000000000000000)
     })
 
@@ -52,24 +50,9 @@ describe('Memecoin', () => {
   })
 
   it('should estimate sell using eth', async () => {
-    const coin = await sdk.getCoin(TGOAT)
-
-    const amountOut = await sdk.estimateSwap({
-      fromToken: 'eth',
-      toToken: coin,
-      amountIn: BigInt(10000000000000000)
-    })
-
-    expect(amountOut).toBeDefined()
-  })
-
-  it('should estimate swap', async () => {
-    const fromToken = await sdk.getCoin(TGOAT)
-    const toToken = await sdk.getCoin(MEME)
-
-    const amountOut = await sdk.estimateSwap({
-      fromToken,
-      toToken,
+    const amountOut = await sdk.estimateSell({
+      coin: TGOAT,
+      using: 'eth',
       amountIn: BigInt(10000000000000000)
     })
 
@@ -79,92 +62,40 @@ describe('Memecoin', () => {
   it('should buy from memepool', async () => {
     const amountIn = parseEther('0.0001')
 
-    const coin = await sdk.getCoin(TGOAT)
-
-    const amountOut = await sdk.estimateSwap({
-      fromToken: 'eth',
-      toToken: coin,
+    await sdk.buy({
+      coin: TGOAT,
+      using: 'eth',
       amountIn
-    })
-
-    await sdk.swap({
-      fromToken: 'eth',
-      toToken: coin,
-      amountIn,
-      amountOut
     })
   })
 
   it('should sell to memepool', async () => {
     const amountIn = parseEther('1')
 
-    const coin = await sdk.getCoin(TGOAT)
-
-    const amountOut = await sdk.estimateSwap({
-      fromToken: coin,
-      toToken: 'eth',
+    await sdk.sell({
+      coin: TGOAT,
+      using: 'eth',
       amountIn
-    })
-
-    const address = walletClient.account.address
-
-    const allowance = await sdk.getERC20Allowance(coin.contractAddress, coin.memePool, address)
-
-    await sdk.swap({
-      fromToken: coin,
-      toToken: 'eth',
-      amountIn,
-      amountOut,
-      allowance
     })
   })
 
   it('should buy from uniswap', async () => {
     const amountIn = parseEther('0.0001')
 
-    const coin = await sdk.getCoin(MEME)
-
-    const amountOut = await sdk.estimateSwap({
-      fromToken: 'eth',
-      toToken: coin,
+    await sdk.buy({
+      coin: MEME,
+      using: 'eth',
       amountIn
-    })
-
-    const pair = await sdk.getPair(coin)
-
-    await sdk.swap({
-      fromToken: 'eth',
-      toToken: coin,
-      amountIn,
-      amountOut,
-      pair
     })
   })
 
   it('should sell to uniswap', async () => {
     const amountIn = parseEther('1')
 
-    const coin = await sdk.getCoin(MEME)
-
-    const amountOut = await sdk.estimateSwap({
-      fromToken: coin,
-      toToken: 'eth',
+    await sdk.sell({
+      coin: MEME,
+      using: 'eth',
       amountIn
-    })
-
-    const pair = await sdk.getPair(coin)
-
-    const address = walletClient.account.address
-
-    const allowance = await sdk.getERC20Allowance(coin.contractAddress, coin.memePool, address)
-
-    await sdk.swap({
-      fromToken: coin,
-      toToken: 'eth',
-      amountIn,
-      amountOut,
-      allowance,
-      pair
     })
   })
 
