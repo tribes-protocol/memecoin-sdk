@@ -3,15 +3,15 @@
 import { getPair } from '@/functions'
 import { MemecoinSDK } from '@/Memecoin'
 import {
+  BuyFrontendParams,
   BuyManyParams,
-  BuyParams,
   EstimateTradeParams,
   EthAddress,
   HexString,
   HydratedCoin,
   LaunchCoinParams,
   LaunchCoinResponse,
-  SellParams
+  SellFrontendParams
 } from '@/types'
 import { Pair } from '@uniswap/v2-sdk'
 import { createContext, ReactNode, useCallback, useContext, useMemo } from 'react'
@@ -22,8 +22,8 @@ interface MemecoinContextType {
   getTrending: () => Promise<HydratedCoin[]>
   estimateBuy: (params: EstimateTradeParams) => Promise<bigint>
   estimateSell: (params: EstimateTradeParams) => Promise<bigint>
-  buy: (params: BuyParams) => Promise<HexString>
-  sell: (params: SellParams) => Promise<HexString>
+  buy: (params: BuyFrontendParams) => Promise<HexString>
+  sell: (params: SellFrontendParams) => Promise<HexString>
   buyMany: (params: BuyManyParams) => Promise<HexString>
   launchCoin: (params: LaunchCoinParams) => Promise<LaunchCoinResponse>
   getPair: (coin: EthAddress) => Promise<Pair>

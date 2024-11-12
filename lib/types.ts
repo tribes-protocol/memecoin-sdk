@@ -127,7 +127,7 @@ export const HydratedCoinSchema = CoinSchema.extend({
 
 export type HydratedCoin = z.infer<typeof HydratedCoinSchema>
 
-export type SellParams = {
+export type SellFrontendParams = {
   coin: HydratedCoin
   using: 'eth'
   amountIn: bigint
@@ -138,21 +138,21 @@ export type SellParams = {
   pair?: Pair
 }
 
-export type TradeSellParams =
-  | SellParams
-  | {
-      coin: EthAddress
-      using: 'eth'
-      amountIn: bigint
-      slippage?: number
-      affiliate?: EthAddress
-    }
+export type SwapBackendParams = {
+  coin: EthAddress
+  using: 'eth'
+  amountIn: bigint
+  slippage?: number
+  affiliate?: EthAddress
+}
 
-export function isSellParams(params: TradeSellParams): params is SellParams {
+export type TradeSellParams = SellFrontendParams | SwapBackendParams
+
+export function isSellFrontendParams(params: TradeSellParams): params is SellFrontendParams {
   return !isRequiredString(params.coin) && 'amountOut' in params
 }
 
-export type BuyParams = {
+export type BuyFrontendParams = {
   coin: HydratedCoin
   using: 'eth'
   amountIn: bigint
@@ -163,26 +163,17 @@ export type BuyParams = {
   lockingDays?: number
 }
 
-export type TradeBuyParams =
-  | {
-      coin: HydratedCoin
-      using: 'eth'
-      amountIn: bigint
-      amountOut: bigint
-      slippage?: number
-      affiliate?: EthAddress
-      pair?: Pair
-      lockingDays?: number
-    }
-  | {
-      coin: EthAddress
-      using: 'eth'
-      amountIn: bigint
-      slippage?: number
-      affiliate?: EthAddress
-    }
+export type BuyBackendParams = {
+  coin: EthAddress
+  using: 'eth'
+  amountIn: bigint
+  slippage?: number
+  affiliate?: EthAddress
+}
 
-export function isBuyParams(params: TradeBuyParams): params is BuyParams {
+export type TradeBuyParams = BuyFrontendParams | BuyBackendParams
+
+export function isBuyFrontendParams(params: TradeBuyParams): params is BuyFrontendParams {
   return !isRequiredString(params.coin) && 'amountOut' in params
 }
 
