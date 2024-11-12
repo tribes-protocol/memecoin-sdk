@@ -40,7 +40,7 @@ describe('Memecoin', () => {
     const amountOut = await sdk.estimateBuy({
       coin: TGOAT,
       using: 'eth',
-      amountIn: BigInt(10000000000000000)
+      amountIn: BigInt(10000000000000000n)
     })
 
     expect(amountOut).toBeDefined()
@@ -50,7 +50,7 @@ describe('Memecoin', () => {
     const amountOut = await sdk.estimateSell({
       coin: TGOAT,
       using: 'eth',
-      amountIn: BigInt(10000000000000000)
+      amountIn: BigInt(10000000000000000n)
     })
 
     expect(amountOut).toBeDefined()
