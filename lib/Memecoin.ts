@@ -15,7 +15,6 @@ import {
 } from '@/constants'
 import {
   encodeOnchainData,
-  getPair,
   isNull,
   isRequiredNumber,
   isRequiredString,
@@ -39,6 +38,7 @@ import {
   TradeBuyParams,
   TradeSellParams
 } from '@/types'
+import { getUniswapPair } from '@/uniswap'
 import { ChainId, CurrencyAmount, Percent, Token, WETH9 } from '@uniswap/sdk-core'
 import { Pair, Route, Trade } from '@uniswap/v2-sdk'
 import BigNumber from 'bignumber.js'
@@ -197,7 +197,7 @@ export class MemecoinSDK {
       ])
       let pair: Pair | undefined
       if (coin.dexInitiated) {
-        pair = await getPair(coin.contractAddress, this.publicClient)
+        pair = await getUniswapPair(coin.contractAddress, this.publicClient)
         return this.buyFromUniswap({
           ...params,
           coin,
@@ -471,7 +471,7 @@ export class MemecoinSDK {
 
       let pair: Pair | undefined
       if (coin.dexInitiated) {
-        pair = await getPair(coin.contractAddress, this.publicClient)
+        pair = await getUniswapPair(coin.contractAddress, this.publicClient)
         return this.sellFromUniswap({
           ...params,
           coin,
