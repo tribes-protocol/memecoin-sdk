@@ -8,13 +8,13 @@ import {
   HexString,
   HydratedCoin,
   LaunchCoinParams,
+  LaunchCoinResponse,
   TradeBuyParams,
   TradeSellParams
 } from '@/types'
 import { Pair } from '@uniswap/v2-sdk'
 import { createContext, ReactNode, useContext, useMemo } from 'react'
 import { useWalletClient } from 'wagmi'
-import { useCapabilities } from 'wagmi/experimental'
 
 interface MemecoinContextType {
   getCoin: (id: EthAddress | number) => Promise<HydratedCoin>
@@ -24,7 +24,7 @@ interface MemecoinContextType {
   buy: (params: TradeBuyParams) => Promise<HexString>
   sell: (params: TradeSellParams) => Promise<HexString>
   buyMany: (params: BuyManyParams) => Promise<HexString>
-  launchCoin: (params: LaunchCoinParams) => Promise<[EthAddress, HexString]>
+  launchCoin: (params: LaunchCoinParams) => Promise<LaunchCoinResponse>
   getPair: (coin: HydratedCoin) => Promise<Pair>
   getERC20Allowance: (
     tokenAddress: EthAddress,
@@ -55,17 +55,15 @@ export const MemecoinProvider = ({
   apiBaseUrl
 }: MemecoinProviderProps): ReactNode => {
   const { data: walletClient } = useWalletClient()
-  const { data: capabilities } = useCapabilities()
 
   const memecoin = useMemo(
     () =>
       new MemecoinSDK({
         walletClient,
         rpcUrl,
-        apiBaseUrl,
-        capabilities
+        apiBaseUrl
       }),
-    [walletClient, rpcUrl, capabilities]
+    [walletClient, rpcUrl]
   )
 
   const contextValue = useMemo(

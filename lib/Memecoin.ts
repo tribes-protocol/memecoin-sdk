@@ -23,6 +23,7 @@ import {
   HydratedCoin,
   HydratedCoinSchema,
   LaunchCoinParams,
+  LaunchCoinResponse,
   MemecoinSDKConfig,
   TradeBuyParams,
   TradeSellParams
@@ -33,6 +34,7 @@ import BigNumber from 'bignumber.js'
 import {
   Abi,
   createPublicClient,
+  createWalletClient,
   encodeFunctionData,
   erc20Abi,
   http,
@@ -41,8 +43,9 @@ import {
   WalletCapabilitiesRecord,
   WalletClient
 } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
 import { base } from 'viem/chains'
-import { eip5792Actions, writeContracts } from 'viem/experimental'
+import { eip5792Actions, getCapabilities, writeContracts } from 'viem/experimental'
 
 const FEE_COLLECTOR = CURRENT_MEME_INFO.FEE_COLLECTOR
 
@@ -53,9 +56,9 @@ export class MemecoinSDK {
   private readonly apiBaseUrl: string
   private readonly publicClient: PublicClient
   private readonly walletClient: WalletClient | undefined
-  private teamFee: bigint | undefined
+  private teamFee: Promise<bigint>
   private teamFeeInterval: NodeJS.Timeout | undefined
-  private capabilities: WalletCapabilitiesRecord<WalletCapabilities, number> | undefined
+  private capabilities: Promise<WalletCapabilitiesRecord<WalletCapabilities, number>> | undefined
 
   constructor(config: MemecoinSDKConfig) {
     this.rpcUrl = config.rpcUrl
@@ -66,11 +69,27 @@ export class MemecoinSDK {
       transport: http(this.rpcUrl)
     }) as PublicClient
 
-    this.walletClient = config.walletClient
-    this.capabilities = config.capabilities
+    if ('walletClient' in config) {
+      this.walletClient = config.walletClient
+    } else if ('privateKey' in config && config.privateKey) {
+      this.walletClient = createWalletClient({
+        account: privateKeyToAccount(config.privateKey),
+        chain: base,
+        transport: http(this.rpcUrl)
+      })
+    }
 
-    this.fetchTeamFee().catch(console.error)
-    this.teamFeeInterval = setInterval(() => this.fetchTeamFee(), 15 * 60 * 1000)
+    if (this.walletClient) {
+      this.capabilities = getCapabilities(this.walletClient)
+    }
+
+    this.teamFee = this.fetchTeamFee()
+    this.teamFeeInterval = setInterval(
+      async () => {
+        this.teamFee = this.fetchTeamFee()
+      },
+      15 * 60 * 1000
+    )
   }
 
   destroy(): void {
@@ -79,30 +98,21 @@ export class MemecoinSDK {
     }
   }
 
-  private async fetchTeamFee(): Promise<void> {
-    try {
-      const response = await fetch(`${this.apiBaseUrl}/api/coins/get-team-fee`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ memeDeployer: CURRENT_MEME_INFO.DEPLOYER })
-      })
-      const data = await response.json()
-      this.teamFee = BigInt(data)
-    } catch (error) {
-      console.error('Failed to fetch team fee:', error)
-    }
-  }
+  private async fetchTeamFee(): Promise<bigint> {
+    const response = await fetch(`${this.apiBaseUrl}/api/coins/get-team-fee`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ memeDeployer: CURRENT_MEME_INFO.DEPLOYER })
+    })
+    const data = await response.json()
 
-  private async getTeamFee(): Promise<bigint> {
-    if (!this.teamFee) {
-      await this.fetchTeamFee()
+    if (!isValidBigIntString(data)) {
+      throw new Error('Invalid response format')
     }
-    if (!this.teamFee) {
-      throw new Error('Failed to get team fee')
-    }
-    return this.teamFee
+
+    return BigInt(data)
   }
 
   private getWalletClient(): WalletClient {
@@ -217,7 +227,13 @@ export class MemecoinSDK {
       chain: base
     }
 
-    const batchSupported = isBatchSupported(this.capabilities)
+    let batchSupported = false
+    try {
+      const capabilities = await this.capabilities
+      batchSupported = isBatchSupported(capabilities)
+    } catch {
+      batchSupported = false
+    }
 
     const tx = batchSupported
       ? await walletClient.sendTransaction(txParams)
@@ -255,7 +271,13 @@ export class MemecoinSDK {
       BigInt(lockingDays ?? 0)
     ]
 
-    const batchSupported = isBatchSupported(this.capabilities)
+    let batchSupported = false
+    try {
+      const capabilities = await this.capabilities
+      batchSupported = isBatchSupported(capabilities)
+    } catch {
+      batchSupported = false
+    }
 
     const data = encodeFunctionData({
       abi,
@@ -330,7 +352,13 @@ export class MemecoinSDK {
       chain: base
     }
 
-    const batchSupported = isBatchSupported(this.capabilities)
+    let batchSupported = false
+    try {
+      const capabilities = await this.capabilities
+      batchSupported = isBatchSupported(capabilities)
+    } catch {
+      batchSupported = false
+    }
 
     const tx = batchSupported
       ? await walletClient.sendTransaction(txParams)
@@ -446,7 +474,8 @@ export class MemecoinSDK {
 
     let batchSupported = false
     try {
-      batchSupported = isBatchSupported(this.capabilities)
+      const capabilities = await this.capabilities
+      batchSupported = isBatchSupported(capabilities)
     } catch {
       batchSupported = false
     }
@@ -706,10 +735,10 @@ export class MemecoinSDK {
     return pair
   }
 
-  async launch(params: LaunchCoinParams): Promise<[EthAddress, HexString]> {
+  async launch(params: LaunchCoinParams): Promise<LaunchCoinResponse> {
     const walletClient = this.getWalletClient()
 
-    const teamFee = await this.getTeamFee()
+    const teamFee = await this.teamFee
 
     const {
       antiSnipeAmount,
@@ -791,7 +820,10 @@ export class MemecoinSDK {
       throw new Error('Failed to create coin')
     }
 
-    return [contractAddress, tx]
+    return {
+      contractAddress,
+      txHash: tx
+    }
   }
 
   private calculateMinAmountWithSlippage(amount: bigint, slippagePercentage: number = 5): bigint {
