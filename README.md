@@ -19,7 +19,7 @@ bun add @memecoin/sdk
 You'll also need the following peer dependencies:
 
 ```bash
-npm install react react-dom @tanstack/react-query wagmi viem
+yarn add react react-dom @tanstack/react-query wagmi viem
 ```
 
 ---
