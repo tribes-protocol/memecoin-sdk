@@ -19,7 +19,7 @@ describe('Memecoin', () => {
   })
 
   const sdk = new MemecoinSDK({
-    walletClient,
+    privateKey: PRIVATE_KEY,
     rpcUrl: RPC_URL,
     apiBaseUrl: 'http://localhost:3000'
   })
