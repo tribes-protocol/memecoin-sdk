@@ -10,7 +10,7 @@ import {
   HydratedCoin,
   LaunchCoinParams,
   LaunchCoinResponse,
-  SwapParams
+  SwapFrontendParams
 } from '@/types'
 import { Pair } from '@uniswap/v2-sdk'
 import { createContext, ReactNode, useCallback, useContext, useMemo } from 'react'
@@ -20,7 +20,7 @@ interface MemecoinContextType {
   getCoin: (id: EthAddress | number) => Promise<HydratedCoin>
   getTrending: () => Promise<HydratedCoin[]>
   estimateSwap: (params: EstimateSwapParams) => Promise<bigint>
-  swap: (params: SwapParams) => Promise<HexString>
+  swap: (params: SwapFrontendParams) => Promise<HexString>
   buyMany: (params: BuyManyParams) => Promise<HexString>
   launchCoin: (params: LaunchCoinParams) => Promise<LaunchCoinResponse>
   getPair: (coin: EthAddress) => Promise<Pair>

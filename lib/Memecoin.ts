@@ -28,6 +28,7 @@ import {
 } from '@/functions'
 import {
   BuyManyParams,
+  BuyParams,
   EstimateSwapCoinParams,
   EstimateSwapParams,
   EstimateTradeParams,
@@ -37,14 +38,17 @@ import {
   HydratedCoin,
   HydratedCoinSchema,
   isBuyParams,
+  isEthAddressOrEth,
   isSellParams,
+  isSwapFrontendParams,
   LaunchCoinParams,
   LaunchCoinResponse,
   MemecoinSDKConfig,
-  SwapCoinParams,
-  SwapParams,
+  SellParams,
+  SwapFrontendParams,
   TradeBuyParams,
-  TradeSellParams
+  TradeSellParams,
+  TradeSwapParams
 } from '@/types'
 import { ChainId, CurrencyAmount, Percent, Token, WETH9 } from '@uniswap/sdk-core'
 import { Pair, Route, Trade } from '@uniswap/v2-sdk'
@@ -187,7 +191,7 @@ export class MemecoinSDK {
     return BigInt(result)
   }
 
-  async buy(params: TradeBuyParams): Promise<HexString> {
+  private async buy(params: TradeBuyParams): Promise<HexString> {
     if (isBuyParams(params)) {
       if (params.coin.dexInitiated) {
         return this.buyFromUniswap(params)
@@ -458,8 +462,8 @@ export class MemecoinSDK {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        fromToken: fromToken.contractAddress,
-        toToken: toToken.contractAddress,
+        fromToken,
+        toToken,
         amountIn: amountIn.toString()
       })
     })
@@ -803,10 +807,16 @@ export class MemecoinSDK {
     }
   }
 
-  async swapCoin(params: SwapCoinParams): Promise<HexString> {
-    const { fromToken, toToken, amountIn, amountOut, allowance, slippage, affiliate } = params
+  private async swapCoin(params: SwapFrontendParams): Promise<HexString> {
+    const { fromToken, toToken, amountIn, amountOut, slippage, affiliate } = params
 
     const walletClient = this.getWalletClient()
+
+    if (fromToken === 'eth' || toToken === 'eth') {
+      throw new Error('ETH is not supported as a fromToken or toToken')
+    }
+
+    const { allowance } = params
 
     const amountOutMin = this.calculateMinAmountWithSlippage(amountOut, slippage)
 
@@ -940,75 +950,77 @@ export class MemecoinSDK {
     }
   }
 
-  async swap(params: SwapParams): Promise<HexString> {
+  async swap(params: TradeSwapParams): Promise<HexString> {
     const { fromToken, toToken } = params
 
     if (fromToken === 'eth') {
-      return this.buy({
-        ...params,
-        coin: toToken,
-        using: 'eth'
-      })
-    } else if (toToken === 'eth') {
-      return this.sell({
-        ...params,
-        coin: fromToken,
-        using: 'eth'
-      })
-    } else {
-      return this.swapCoin({
-        ...params,
-        fromToken,
-        toToken
-      })
-    }
-  }
-
-  async getPair(coin: HydratedCoin): Promise<Pair> {
-    const token = new Token(ChainId.BASE, coin.contractAddress, 18)
-    const weth = WETH9[ChainId.BASE]
-    if (isNull(weth)) {
-      throw new Error('WETH9 is not supported on this chain')
-    }
-
-    const pairAddress = Pair.getAddress(token, weth)
-    const reserves = await this.publicClient.readContract({
-      address: EthAddressSchema.parse(pairAddress),
-      abi: [
-        {
-          constant: true,
-          inputs: [],
-          name: 'getReserves',
-          outputs: [
-            { name: 'reserve0', type: 'uint112' },
-            { name: 'reserve1', type: 'uint112' },
-            { name: 'blockTimestampLast', type: 'uint32' }
-          ],
-          type: 'function'
+      if (isSwapFrontendParams(params)) {
+        return this.buy({
+          ...params,
+          coin: toToken,
+          using: 'eth'
+        })
+      } else {
+        const to = toToken
+        if (isEthAddressOrEth(to)) {
+          return this.buy({
+            ...params,
+            coin: to,
+            using: 'eth'
+          })
+        } else {
+          throw new Error('Invalid swap params')
         }
-      ],
-      functionName: 'getReserves'
-    })
+      }
+    } else if (toToken === 'eth') {
+      if (isSwapFrontendParams(params)) {
+        return this.sell({
+          ...params,
+          coin: fromToken,
+          using: 'eth'
+        })
+      } else {
+        const from = fromToken
+        if (isEthAddressOrEth(from)) {
+          return this.sell({
+            ...params,
+            coin: from,
+            using: 'eth'
+          })
+        } else {
+          throw new Error('Invalid swap params')
+        }
+      }
+    } else {
+      if (isSwapFrontendParams(params)) {
+        return this.swapCoin(params)
+      } else {
+        if (params.toToken === 'eth') {
+          throw new Error('ETH is not supported as a toToken')
+        }
 
-    if (!Array.isArray(reserves) || reserves.length < 2) {
-      throw new Error('Invalid reserves')
+        const walletClient = this.getWalletClient()
+        const address = walletClient.account?.address
+        if (isNull(address)) {
+          throw new Error('No account found')
+        }
+
+        const [from, to, amountOut, allowance] = await Promise.all([
+          this.getCoin(params.fromToken),
+          this.getCoin(params.toToken),
+          this.estimateSwap(params),
+          this.getERC20Allowance(params.fromToken, MEME_V3.MEME_SWAP, address)
+        ])
+
+        return this.swapCoin({
+          ...params,
+          fromToken: from,
+          toToken: to,
+          allowance,
+          amountOut
+        })
+      }
     }
-
-    const [reserve0, reserve1] = reserves.slice(0, 2).map(BigInt)
-
-    if (isNull(reserve0) || isNull(reserve1)) {
-      throw new Error('Invalid reserves')
-    }
-
-    const tokens = [token, weth] as const
-    const [token0, token1] = tokens[0].sortsBefore(tokens[1]) ? tokens : [tokens[1], tokens[0]]
-
-    const pair = new Pair(
-      CurrencyAmount.fromRawAmount(token0, reserve0.toString()),
-      CurrencyAmount.fromRawAmount(token1, reserve1.toString())
-    )
-
-    return pair
   }
 
   async launch(params: LaunchCoinParams): Promise<LaunchCoinResponse> {
