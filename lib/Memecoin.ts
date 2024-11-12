@@ -27,8 +27,8 @@ import {
   isValidBigIntString
 } from '@/functions'
 import {
+  BuyFrontendParams,
   BuyManyParams,
-  BuyParams,
   EstimateSwapCoinParams,
   EstimateSwapParams,
   EstimateTradeParams,
@@ -37,14 +37,12 @@ import {
   HexString,
   HydratedCoin,
   HydratedCoinSchema,
-  isBuyParams,
   isEthAddressOrEth,
-  isSellParams,
+  isSellFrontendParams,
   isSwapFrontendParams,
   LaunchCoinParams,
   LaunchCoinResponse,
   MemecoinSDKConfig,
-  SellParams,
   SwapFrontendParams,
   TradeBuyParams,
   TradeSellParams,
@@ -192,7 +190,7 @@ export class MemecoinSDK {
   }
 
   private async buy(params: TradeBuyParams): Promise<HexString> {
-    if (isBuyParams(params)) {
+    if (isBuyFrontendParams(params)) {
       if (params.coin.dexInitiated) {
         return this.buyFromUniswap(params)
       } else {
@@ -222,7 +220,7 @@ export class MemecoinSDK {
     }
   }
 
-  private async buyFromUniswap(params: BuyParams): Promise<HexString> {
+  private async buyFromUniswap(params: BuyFrontendParams): Promise<HexString> {
     const { coin, amountIn: ethAmount, slippage, pair } = params
 
     const walletClient = this.getWalletClient()
@@ -293,7 +291,10 @@ export class MemecoinSDK {
     return receipt.transactionHash
   }
 
-  private async buyFromMemecoin(params: BuyParams, memePool: EthAddress): Promise<HexString> {
+  private async buyFromMemecoin(
+    params: BuyFrontendParams,
+    memePool: EthAddress
+  ): Promise<HexString> {
     const walletClient = this.getWalletClient()
 
     const { coin, amountIn, amountOut, affiliate, slippage, lockingDays } = params
@@ -490,7 +491,7 @@ export class MemecoinSDK {
   }
 
   private async sell(params: TradeSellParams): Promise<HexString> {
-    if (isSellParams(params)) {
+    if (isSellFrontendParams(params)) {
       if (params.coin.dexInitiated) {
         return this.sellFromUniswap(params)
       } else {
@@ -530,7 +531,7 @@ export class MemecoinSDK {
     }
   }
 
-  private async sellFromUniswap(params: SellParams): Promise<HexString> {
+  private async sellFromUniswap(params: SellFrontendParams): Promise<HexString> {
     const { coin, amountIn: tokenAmount, amountOut, slippage, pair, allowance } = params
 
     const walletClient = this.getWalletClient()
@@ -689,7 +690,10 @@ export class MemecoinSDK {
     }
   }
 
-  private async sellFromMemecoin(params: SellParams, memePool: EthAddress): Promise<HexString> {
+  private async sellFromMemecoin(
+    params: SellFrontendParams,
+    memePool: EthAddress
+  ): Promise<HexString> {
     const { coin, amountIn, amountOut, affiliate, slippage, allowance } = params
 
     const walletClient = this.getWalletClient()
