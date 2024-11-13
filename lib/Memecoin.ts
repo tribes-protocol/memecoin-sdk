@@ -169,7 +169,7 @@ export class MemecoinSDK {
     return data
   }
 
-  private async estimateBuy(params: EstimateTradeParams): Promise<bigint> {
+  async estimateBuy(params: EstimateTradeParams): Promise<bigint> {
     const { coin, amountIn } = params
 
     const response = await fetch(`${this.apiBaseUrl}/api/coins/get-amount-out-tokens`, {
@@ -192,7 +192,7 @@ export class MemecoinSDK {
     return BigInt(result)
   }
 
-  private async buy(params: TradeBuyParams): Promise<HexString> {
+  async buy(params: TradeBuyParams): Promise<HexString> {
     if (isBuyFrontendParams(params)) {
       if (params.coin.dexInitiated) {
         return this.buyFromUniswap(params)
@@ -431,7 +431,7 @@ export class MemecoinSDK {
     return receipt.transactionHash
   }
 
-  private async estimateSell(params: EstimateTradeParams): Promise<bigint> {
+  async estimateSell(params: EstimateTradeParams): Promise<bigint> {
     const { coin, amountIn } = params
 
     const response = await fetch(`${this.apiBaseUrl}/api/coins/get-amount-out-eth`, {
@@ -490,7 +490,7 @@ export class MemecoinSDK {
     }
   }
 
-  private async sell(params: TradeSellParams): Promise<HexString> {
+  async sell(params: TradeSellParams): Promise<HexString> {
     if (isSellFrontendParams(params)) {
       if (params.coin.dexInitiated) {
         return this.sellFromUniswap(params)
@@ -811,7 +811,7 @@ export class MemecoinSDK {
   private async swapCoin(params: SwapFrontendParams): Promise<HexString> {
     const { fromToken, toToken, amountIn, amountOut, slippage, affiliate } = params
 
-    const walletClient = this.getWalletClient()
+    const walletClient = await this.walletClient
 
     if (fromToken === 'eth' || toToken === 'eth') {
       throw new Error('ETH is not supported as a fromToken or toToken')
@@ -1000,7 +1000,7 @@ export class MemecoinSDK {
           throw new Error('ETH is not supported as a toToken')
         }
 
-        const walletClient = this.getWalletClient()
+        const walletClient = await this.walletClient
         const address = walletClient.account?.address
         if (isNull(address)) {
           throw new Error('No account found')
