@@ -21,17 +21,18 @@ export const HexStringSchema = z
 
 export type HexString = z.infer<typeof HexStringSchema>
 
+type BaseMemecoinSDKConfig = {
+  rpcUrl: string
+  apiBaseUrl?: string
+}
+
 export type MemecoinSDKConfig =
-  | {
-      rpcUrl: string
-      apiBaseUrl?: string
+  | (BaseMemecoinSDKConfig & {
       walletClient?: WalletClient
-    }
-  | {
-      rpcUrl: string
-      apiBaseUrl?: string
+    })
+  | (BaseMemecoinSDKConfig & {
       privateKey?: HexString
-    }
+    })
 
 export interface LaunchCoinParams {
   name: string
@@ -137,23 +138,22 @@ export function isEthAddressOrEth(coin: any): coin is EthAddress | 'eth' {
   return coin === 'eth' || isRequiredString(coin)
 }
 
-export type SellFrontendParams = {
-  coin: HydratedCoin
-  using: 'eth' | EthAddress
-  amountIn: bigint
-  amountOut: bigint
-  allowance: bigint
-  slippage?: number
-  affiliate?: EthAddress
-  pair?: Pair
-}
-
-export type SellBackendParams = {
-  coin: EthAddress
+export interface BaseSellParams {
   using: 'eth'
   amountIn: bigint
   slippage?: number
   affiliate?: EthAddress
+}
+
+export interface SellFrontendParams extends BaseSellParams {
+  coin: HydratedCoin
+  amountOut: bigint
+  allowance: bigint
+  pair?: Pair
+}
+
+export interface SellBackendParams extends BaseSellParams {
+  coin: EthAddress
 }
 
 export type TradeSellParams = SellFrontendParams | SellBackendParams
@@ -162,23 +162,22 @@ export function isSellFrontendParams(params: TradeSellParams): params is SellFro
   return !isRequiredString(params.coin) && 'amountOut' in params
 }
 
-export type BuyFrontendParams = {
-  coin: HydratedCoin
+export interface BaseBuyParams {
   using: 'eth'
   amountIn: bigint
-  amountOut: bigint
   slippage?: number
   affiliate?: EthAddress
-  pair?: Pair
   lockingDays?: number
 }
 
-export type BuyBackendParams = {
+export interface BuyFrontendParams extends BaseBuyParams {
+  coin: HydratedCoin
+  amountOut: bigint
+  pair?: Pair
+}
+
+export interface BuyBackendParams extends BaseBuyParams {
   coin: EthAddress
-  using: 'eth'
-  amountIn: bigint
-  slippage?: number
-  affiliate?: EthAddress
 }
 
 export type TradeBuyParams = BuyFrontendParams | BuyBackendParams

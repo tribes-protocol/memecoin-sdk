@@ -20,7 +20,6 @@ import {
 } from '@/constants'
 import {
   encodeOnchainData,
-  getPair,
   isNull,
   isRequiredNumber,
   isRequiredString,
@@ -50,6 +49,7 @@ import {
   TradeSellParams,
   TradeSwapParams
 } from '@/types'
+import { getUniswapPair } from '@/uniswap'
 import { ChainId, CurrencyAmount, Percent, Token, WETH9 } from '@uniswap/sdk-core'
 import { Pair, Route, Trade } from '@uniswap/v2-sdk'
 import BigNumber from 'bignumber.js'
@@ -77,9 +77,9 @@ export class MemecoinSDK {
   private readonly rpcUrl: string
   private readonly apiBaseUrl: string
   private readonly publicClient: PublicClient
-  private readonly walletClient: WalletClient | undefined
-  private teamFee: Promise<bigint>
-  private teamFeeInterval: NodeJS.Timeout | undefined
+  private readonly walletClient: Promise<WalletClient>
+  private teamFee: Promise<bigint> = Promise.resolve(200000000000000n)
+  private teamFeeInterval: NodeJS.Timeout
   private capabilities: Promise<WalletCapabilitiesRecord<WalletCapabilities, number>> | undefined
 
   constructor(config: MemecoinSDKConfig) {
@@ -91,32 +91,40 @@ export class MemecoinSDK {
       transport: http(this.rpcUrl)
     }) as PublicClient
 
-    if ('walletClient' in config) {
-      this.walletClient = config.walletClient
+    if ('walletClient' in config && config.walletClient) {
+      this.walletClient = Promise.resolve(config.walletClient)
     } else if ('privateKey' in config && config.privateKey) {
-      this.walletClient = createWalletClient({
-        account: privateKeyToAccount(config.privateKey),
-        chain: base,
-        transport: http(this.rpcUrl)
-      })
+      this.walletClient = Promise.resolve(
+        createWalletClient({
+          account: privateKeyToAccount(config.privateKey),
+          chain: base,
+          transport: http(this.rpcUrl)
+        })
+      )
+    } else {
+      this.walletClient = Promise.reject(
+        new Error('Wallet client is required for write operations')
+      )
     }
 
-    if (this.walletClient) {
-      this.capabilities = getCapabilities(this.walletClient)
+    if ('walletClient' in config && config.walletClient) {
+      this.capabilities = getCapabilities(config.walletClient)
     }
 
-    this.teamFee = this.fetchTeamFee()
-    this.teamFeeInterval = setInterval(
-      async () => {
-        this.teamFee = this.fetchTeamFee()
-      },
-      15 * 60 * 1000
-    )
+    void this.refreshTeamFee()
+    this.teamFeeInterval = setInterval(() => this.refreshTeamFee(), 15 * 60 * 1000)
   }
 
   destroy(): void {
-    if (this.teamFeeInterval) {
-      clearInterval(this.teamFeeInterval)
+    clearInterval(this.teamFeeInterval)
+  }
+
+  private async refreshTeamFee(): Promise<void> {
+    try {
+      const fee = await this.fetchTeamFee()
+      this.teamFee = Promise.resolve(fee)
+    } catch (e) {
+      console.warn('Error fetching team fee', e)
     }
   }
 
@@ -135,13 +143,6 @@ export class MemecoinSDK {
     }
 
     return BigInt(data)
-  }
-
-  private getWalletClient(): WalletClient {
-    if (isNull(this.walletClient)) {
-      throw new Error('Read only mode, pass a wallet client for write operations')
-    }
-    return this.walletClient
   }
 
   async getCoin(id: EthAddress | number): Promise<HydratedCoin> {
@@ -196,7 +197,7 @@ export class MemecoinSDK {
       if (params.coin.dexInitiated) {
         return this.buyFromUniswap(params)
       } else {
-        return this.buyFromMemecoin(params, params.coin.memePool)
+        return this.buyFromMemecoin(params)
       }
     } else {
       const [coin, amountOut] = await Promise.all([
@@ -209,7 +210,7 @@ export class MemecoinSDK {
       ])
       let pair: Pair | undefined
       if (coin.dexInitiated) {
-        pair = await getPair(coin.contractAddress, this.publicClient)
+        pair = await getUniswapPair(coin.contractAddress, this.publicClient)
         return this.buyFromUniswap({
           ...params,
           coin,
@@ -217,7 +218,7 @@ export class MemecoinSDK {
           pair
         })
       } else {
-        return this.buyFromMemecoin({ ...params, coin, amountOut }, coin.memePool)
+        return this.buyFromMemecoin({ ...params, coin, amountOut })
       }
     }
   }
@@ -225,7 +226,7 @@ export class MemecoinSDK {
   private async buyFromUniswap(params: BuyFrontendParams): Promise<HexString> {
     const { coin, amountIn: ethAmount, slippage, pair } = params
 
-    const walletClient = this.getWalletClient()
+    const walletClient = await this.walletClient
     const token = new Token(ChainId.BASE, coin.contractAddress, 18)
     const weth = WETH9[ChainId.BASE]
     if (isNull(weth)) {
@@ -293,11 +294,8 @@ export class MemecoinSDK {
     return receipt.transactionHash
   }
 
-  private async buyFromMemecoin(
-    params: BuyFrontendParams,
-    memePool: EthAddress
-  ): Promise<HexString> {
-    const walletClient = this.getWalletClient()
+  private async buyFromMemecoin(params: BuyFrontendParams): Promise<HexString> {
+    const walletClient = await this.walletClient
 
     const { coin, amountIn, amountOut, affiliate, slippage, lockingDays } = params
 
@@ -308,7 +306,7 @@ export class MemecoinSDK {
       throw new Error('No account found')
     }
 
-    const abi = getBuyTokensABI(memePool)
+    const abi = getBuyTokensABI(coin.memePool)
 
     const args = [
       coin.contractAddress,
@@ -332,7 +330,7 @@ export class MemecoinSDK {
     })
 
     const txParams = {
-      to: memePool,
+      to: coin.memePool,
       data,
       value: amountIn,
       account,
@@ -355,7 +353,7 @@ export class MemecoinSDK {
   }
 
   async buyManyMemecoins(params: BuyManyParams): Promise<HexString> {
-    const walletClient = this.getWalletClient()
+    const walletClient = await this.walletClient
 
     const { memeCoins, ethAmounts, expectedTokensAmounts, affiliate, lockingDays } = params
 
@@ -497,7 +495,7 @@ export class MemecoinSDK {
       if (params.coin.dexInitiated) {
         return this.sellFromUniswap(params)
       } else {
-        return this.sellFromMemecoin(params, params.coin.memePool)
+        return this.sellFromMemecoin(params)
       }
     } else {
       const [coin, amountOut] = await Promise.all([
@@ -509,7 +507,7 @@ export class MemecoinSDK {
         })
       ])
 
-      const walletClient = this.getWalletClient()
+      const walletClient = await this.walletClient
       const address = walletClient.account?.address
       if (isNull(address)) {
         throw new Error('No account found')
@@ -519,7 +517,7 @@ export class MemecoinSDK {
 
       let pair: Pair | undefined
       if (coin.dexInitiated) {
-        pair = await getPair(coin.contractAddress, this.publicClient)
+        pair = await getUniswapPair(coin.contractAddress, this.publicClient)
         return this.sellFromUniswap({
           ...params,
           coin,
@@ -528,7 +526,7 @@ export class MemecoinSDK {
           allowance
         })
       } else {
-        return this.sellFromMemecoin({ ...params, coin, amountOut, allowance }, coin.memePool)
+        return this.sellFromMemecoin({ ...params, coin, amountOut, allowance })
       }
     }
   }
@@ -536,7 +534,7 @@ export class MemecoinSDK {
   private async sellFromUniswap(params: SellFrontendParams): Promise<HexString> {
     const { coin, amountIn: tokenAmount, amountOut, slippage, pair, allowance } = params
 
-    const walletClient = this.getWalletClient()
+    const walletClient = await this.walletClient
 
     const token = new Token(ChainId.BASE, coin.contractAddress, 18)
     const weth = WETH9[ChainId.BASE]
@@ -692,13 +690,10 @@ export class MemecoinSDK {
     }
   }
 
-  private async sellFromMemecoin(
-    params: SellFrontendParams,
-    memePool: EthAddress
-  ): Promise<HexString> {
+  private async sellFromMemecoin(params: SellFrontendParams): Promise<HexString> {
     const { coin, amountIn, amountOut, affiliate, slippage, allowance } = params
 
-    const walletClient = this.getWalletClient()
+    const walletClient = await this.walletClient
 
     const minETHAmount = this.calculateMinAmountWithSlippage(amountOut, slippage)
 
@@ -706,11 +701,11 @@ export class MemecoinSDK {
       address: coin.contractAddress,
       abi: erc20Abi,
       functionName: 'approve',
-      args: [memePool, amountIn]
+      args: [coin.memePool, amountIn]
     } as const
 
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    const abi = getSellTokensABI(memePool) as Abi
+    const abi = getSellTokensABI(coin.memePool) as Abi
 
     const account = walletClient.account
     if (isNull(account)) {
@@ -722,7 +717,7 @@ export class MemecoinSDK {
     }
 
     const sellContractCall = {
-      address: memePool,
+      address: coin.memePool,
       abi,
       functionName: 'sellTokens',
       args: [coin.contractAddress, amountIn, minETHAmount, affiliate ?? FEE_COLLECTOR]
@@ -791,7 +786,7 @@ export class MemecoinSDK {
       const data = encodeFunctionData(sellContractCall)
 
       const txParams = {
-        to: memePool,
+        to: coin.memePool,
         data,
         account,
         chain: base
@@ -1030,7 +1025,7 @@ export class MemecoinSDK {
   }
 
   async launch(params: LaunchCoinParams): Promise<LaunchCoinResponse> {
-    const walletClient = this.getWalletClient()
+    const walletClient = await this.walletClient
 
     const teamFee = await this.teamFee
 

@@ -1,6 +1,5 @@
 'use client'
 
-import { getPair } from '@/functions'
 import { MemecoinSDK } from '@/Memecoin'
 import {
   BuyManyParams,
@@ -12,6 +11,7 @@ import {
   LaunchCoinResponse,
   SwapFrontendParams
 } from '@/types'
+import { getUniswapPair } from '@/uniswap'
 import { Pair } from '@uniswap/v2-sdk'
 import { createContext, ReactNode, useCallback, useContext, useMemo } from 'react'
 import { usePublicClient, useWalletClient } from 'wagmi'
@@ -65,8 +65,8 @@ export const MemecoinProvider = ({
     [walletClient, rpcUrl]
   )
 
-  const getUniswapPair = useCallback(
-    (coin: EthAddress): Promise<Pair> => getPair(coin, publicClient),
+  const getUniswapDexPair = useCallback(
+    (coin: EthAddress): Promise<Pair> => getUniswapPair(coin, publicClient),
     [publicClient]
   )
 
@@ -77,11 +77,11 @@ export const MemecoinProvider = ({
       estimateSwap: memecoin.estimateSwap.bind(memecoin),
       swap: memecoin.swap.bind(memecoin),
       launchCoin: memecoin.launch.bind(memecoin),
-      getPair: getUniswapPair,
+      getPair: getUniswapDexPair,
       getERC20Allowance: memecoin.getERC20Allowance.bind(memecoin),
       buyMany: memecoin.buyManyMemecoins.bind(memecoin)
     }),
-    [memecoin, getUniswapPair]
+    [memecoin, getUniswapDexPair]
   )
 
   return <MemecoinContext.Provider value={contextValue}>{children}</MemecoinContext.Provider>

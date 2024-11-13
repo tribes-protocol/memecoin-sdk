@@ -19,7 +19,7 @@ bun add @memecoin/sdk
 You'll also need the following peer dependencies:
 
 ```bash
-npm install react react-dom @tanstack/react-query wagmi viem
+yarn add react react-dom @tanstack/react-query wagmi viem
 ```
 
 ---
@@ -33,14 +33,9 @@ import { MemecoinSDK } from '@memecoin/sdk'
 import { createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
-const walletClient = createWalletClient({
-  account: privateKeyToAccount(PRIVATE_KEY),
-  transport: http(RPC_URL)
-})
-
 const sdk = new MemecoinSDK({
-  rpcUrl: 'https://base-mainnet.g.alchemy.com/v2/demo',
-  walletClient // Optional, only needed for write operations
+  rpcUrl: 'https://base-mainnet.g.alchemy.com/v2/API_KEY',
+  privateKey: PRIVATE_KEY // Optional, only needed for write operations
 })
 ```
 
@@ -67,6 +62,7 @@ Estimate the amount of tokens received from a buy order:
 ```typescript
 const amountOut = await sdk.estimateBuy({
   coin,
+  using: 'eth',
   amountIn: BigInt(10000000000000000)
 })
 ```
@@ -78,8 +74,9 @@ Execute a buy transaction for a specific coin:
 ```typescript
 const transactionHash = await sdk.buy({
   coin,
+  using: 'eth',
   amountIn: BigInt(10000000000000000),
-  amountOut: BigInt(50000000000000000) // Expected output tokens
+  slippage: 5 // Optional, 5% slippage
 })
 ```
 
@@ -90,6 +87,7 @@ Estimate the amount of ETH received from a sell order:
 ```typescript
 const amountOut = await sdk.estimateSell({
   coin,
+  using: 'eth',
   amountIn: BigInt(50000000000000000)
 })
 ```
@@ -101,8 +99,9 @@ Execute a sell transaction for a specific coin:
 ```typescript
 const transactionHash = await sdk.sell({
   coin,
+  using: 'eth',
   amountIn: BigInt(50000000000000000),
-  amountOut: BigInt(10000000000000000) // Expected output ETH
+  slippage: 5 // Optional, 5% slippage
 })
 ```
 
@@ -111,7 +110,7 @@ const transactionHash = await sdk.sell({
 Launch a newly generated token:
 
 ```typescript
-const [contractAddress, txHash] = await sdk.launch({
+const { contractAddress, txHash } = await sdk.launch({
   name: 'New Meme',
   ticker: 'NMEME',
   antiSnipeAmount: BigInt(1000000000000000),

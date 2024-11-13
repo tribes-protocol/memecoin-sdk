@@ -34,20 +34,20 @@ describe('Memecoin', () => {
   })
 
   it('should estimate buy using eth', async () => {
-    const amountOut = await sdk.estimateSwap({
-      fromToken: 'eth',
-      toToken: TGOAT,
-      amountIn: BigInt(10000000000000000)
+    const amountOut = await sdk.estimateBuy({
+      coin: TGOAT,
+      using: 'eth',
+      amountIn: BigInt(10000000000000000n)
     })
 
     expect(amountOut).toBeDefined()
   })
 
   it('should estimate sell using eth', async () => {
-    const amountOut = await sdk.estimateSwap({
-      fromToken: 'eth',
-      toToken: TGOAT,
-      amountIn: BigInt(10000000000000000)
+    const amountOut = await sdk.estimateSell({
+      coin: TGOAT,
+      using: 'eth',
+      amountIn: BigInt(10000000000000000n)
     })
 
     expect(amountOut).toBeDefined()
@@ -56,9 +56,9 @@ describe('Memecoin', () => {
   it('should buy from memepool', async () => {
     const amountIn = parseEther('0.0001')
 
-    await sdk.swap({
-      fromToken: 'eth',
-      toToken: TGOAT,
+    await sdk.buy({
+      coin: TGOAT,
+      using: 'eth',
       amountIn
     })
   })
@@ -66,9 +66,9 @@ describe('Memecoin', () => {
   it('should sell to memepool', async () => {
     const amountIn = parseEther('1')
 
-    await sdk.swap({
-      fromToken: TGOAT,
-      toToken: 'eth',
+    await sdk.sell({
+      coin: TGOAT,
+      using: 'eth',
       amountIn
     })
   })
@@ -76,9 +76,9 @@ describe('Memecoin', () => {
   it('should buy from uniswap', async () => {
     const amountIn = parseEther('0.0001')
 
-    await sdk.swap({
-      fromToken: 'eth',
-      toToken: MEME,
+    await sdk.buy({
+      coin: MEME,
+      using: 'eth',
       amountIn
     })
   })
@@ -86,9 +86,9 @@ describe('Memecoin', () => {
   it('should sell to uniswap', async () => {
     const amountIn = parseEther('1')
 
-    await sdk.swap({
-      fromToken: MEME,
-      toToken: 'eth',
+    await sdk.sell({
+      coin: MEME,
+      using: 'eth',
       amountIn
     })
   })
