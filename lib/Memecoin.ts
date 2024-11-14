@@ -808,7 +808,7 @@ export class MemecoinSDK {
     }
   }
 
-  private async swapCoin(params: SwapFrontendParams): Promise<HexString> {
+  private async swapCoinFrontend(params: SwapFrontendParams): Promise<HexString> {
     const { fromToken, toToken, amountIn, amountOut, slippage, affiliate } = params
 
     const walletClient = await this.walletClient
@@ -994,7 +994,7 @@ export class MemecoinSDK {
       }
     } else {
       if (isSwapFrontendParams(params)) {
-        return this.swapCoin(params)
+        return this.swapCoinFrontend(params)
       } else {
         if (params.toToken === 'eth') {
           throw new Error('ETH is not supported as a toToken')
@@ -1013,7 +1013,7 @@ export class MemecoinSDK {
           this.getERC20Allowance(params.fromToken, MEME_V3.MEME_SWAP, address)
         ])
 
-        return this.swapCoin({
+        return this.swapCoinFrontend({
           ...params,
           fromToken: from,
           toToken: to,

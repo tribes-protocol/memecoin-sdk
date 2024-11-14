@@ -130,12 +130,14 @@ export type HydratedCoin = z.infer<typeof HydratedCoinSchema>
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function isHydratedCoinOrEth(coin: any): coin is HydratedCoin | 'eth' {
-  return coin === 'eth' || !isRequiredString(coin)
+  if (coin === 'eth') return true
+  return HydratedCoinSchema.safeParse(coin).success
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function isEthAddressOrEth(coin: any): coin is EthAddress | 'eth' {
-  return coin === 'eth' || isRequiredString(coin)
+  if (coin === 'eth') return true
+  return EthAddressSchema.safeParse(coin).success
 }
 
 export interface BaseSellParams {
