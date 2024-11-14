@@ -2,7 +2,8 @@ import {
   BUY_MANY_TOKENS_ABI_V2,
   BUY_TOKENS_ABI_V2,
   CREATE_MEME_ABI_V2,
-  SELL_TOKENS_ABI_V2
+  SELL_TOKENS_ABI_V2,
+  SWAP_MEMECOIN_ABI
 } from '@/abi'
 import { ABI, EthAddress, EthAddressSchema } from '@/types'
 import { parseUnits, WalletCapabilities } from 'viem'
@@ -20,20 +21,24 @@ export interface MemeContracts {
   DEPLOYER: EthAddress
   POOL: EthAddress
   FEE_COLLECTOR: EthAddress
+  MEME_SWAP: EthAddress
   CREATE_MEME_ABI: ABI
   BUY_TOKENS_ABI: ABI
   SELL_TOKENS_ABI: ABI
   BUY_MANY_TOKENS_ABI: ABI
+  SWAP_ABI: ABI
 }
 
 export const MEME_V3: MemeContracts = {
   DEPLOYER: EthAddressSchema.parse('0x4Cc5332C8Cee730B2fb72E53E060B440359218F9'),
   POOL: EthAddressSchema.parse('0x413371f1D40b32674953a7DC18885D3ece98ed63'),
   FEE_COLLECTOR: EthAddressSchema.parse('0x74b2a494B547bFa9c2a3Dfd5ff095Cb81830a1d2'),
+  MEME_SWAP: EthAddressSchema.parse('0x09ebEa36D1b2dF059648f525230f2E7331106CB7'),
   CREATE_MEME_ABI: CREATE_MEME_ABI_V2,
   BUY_TOKENS_ABI: BUY_TOKENS_ABI_V2,
   SELL_TOKENS_ABI: SELL_TOKENS_ABI_V2,
-  BUY_MANY_TOKENS_ABI: BUY_MANY_TOKENS_ABI_V2
+  BUY_MANY_TOKENS_ABI: BUY_MANY_TOKENS_ABI_V2,
+  SWAP_ABI: SWAP_MEMECOIN_ABI
 }
 
 export const CURRENT_MEME_INFO = MEME_V3

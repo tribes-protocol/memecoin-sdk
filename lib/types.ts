@@ -128,6 +128,18 @@ export const HydratedCoinSchema = CoinSchema.extend({
 
 export type HydratedCoin = z.infer<typeof HydratedCoinSchema>
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function isHydratedCoinOrEth(coin: any): coin is HydratedCoin | 'eth' {
+  if (coin === 'eth') return true
+  return HydratedCoinSchema.safeParse(coin).success
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function isEthAddressOrEth(coin: any): coin is EthAddress | 'eth' {
+  if (coin === 'eth') return true
+  return EthAddressSchema.safeParse(coin).success
+}
+
 export interface BaseSellParams {
   using: 'eth'
   amountIn: bigint
@@ -192,4 +204,71 @@ export interface EstimateTradeParams {
   coin: EthAddress
   using: 'eth'
   amountIn: bigint
+}
+
+export interface EstimateSwapCoinParams {
+  fromToken: EthAddress
+  toToken: EthAddress
+  amountIn: bigint
+}
+
+export type EstimateSwapParams =
+  | {
+      fromToken: EthAddress
+      toToken: EthAddress | 'eth'
+      amountIn: bigint
+    }
+  | {
+      fromToken: 'eth'
+      toToken: EthAddress
+      amountIn: bigint
+    }
+
+export type SwapFrontendParams =
+  | {
+      fromToken: HydratedCoin
+      toToken: HydratedCoin | 'eth'
+      amountIn: bigint
+      amountOut: bigint
+      allowance: bigint
+      slippage?: number
+      affiliate?: EthAddress
+      pair?: Pair
+    }
+  | {
+      fromToken: 'eth'
+      toToken: HydratedCoin
+      amountIn: bigint
+      amountOut: bigint
+      lockingDays?: number
+      slippage?: number
+      affiliate?: EthAddress
+      pair?: Pair
+    }
+
+export type SwapBackendParams =
+  | {
+      fromToken: EthAddress
+      toToken: EthAddress | 'eth'
+      amountIn: bigint
+      slippage?: number
+      affiliate?: EthAddress
+    }
+  | {
+      fromToken: 'eth'
+      toToken: EthAddress
+      amountIn: bigint
+      lockingDays?: number
+      slippage?: number
+      affiliate?: EthAddress
+    }
+
+export type TradeSwapParams = SwapFrontendParams | SwapBackendParams
+
+export function isSwapFrontendParams(params: TradeSwapParams): params is SwapFrontendParams {
+  return (
+    'amountOut' in params &&
+    isHydratedCoinOrEth(params.fromToken) &&
+    isHydratedCoinOrEth(params.toToken)
+  )
 }

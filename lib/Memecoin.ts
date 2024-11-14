@@ -1,4 +1,8 @@
-import { SWAP_EXACT_ETH_FOR_TOKENS_ABI, SWAP_EXACT_TOKENS_FOR_ETH_ABI } from '@/abi'
+import {
+  SWAP_EXACT_ETH_FOR_TOKENS_ABI,
+  SWAP_EXACT_TOKENS_FOR_ETH_ABI,
+  SWAP_MEMECOIN_ABI
+} from '@/abi'
 import {
   API_BASE_URL,
   CURRENT_MEME_INFO,
@@ -9,6 +13,7 @@ import {
   INITIAL_RESERVE,
   INITIAL_SUPPLY,
   isBatchSupported,
+  MEME_V3,
   UNISWAP_V2_ROUTER,
   UNISWAP_V2_ROUTER_PROXY,
   WETH_TOKEN
@@ -23,6 +28,8 @@ import {
 import {
   BuyFrontendParams,
   BuyManyParams,
+  EstimateSwapCoinParams,
+  EstimateSwapParams,
   EstimateTradeParams,
   EthAddress,
   EthAddressSchema,
@@ -30,13 +37,17 @@ import {
   HydratedCoin,
   HydratedCoinSchema,
   isBuyFrontendParams,
+  isEthAddressOrEth,
   isSellFrontendParams,
+  isSwapFrontendParams,
   LaunchCoinParams,
   LaunchCoinResponse,
   MemecoinSDKConfig,
   SellFrontendParams,
+  SwapFrontendParams,
   TradeBuyParams,
-  TradeSellParams
+  TradeSellParams,
+  TradeSwapParams
 } from '@/types'
 import { getUniswapPair } from '@/uniswap'
 import { ChainId, CurrencyAmount, Percent, Token, WETH9 } from '@uniswap/sdk-core'
@@ -443,6 +454,42 @@ export class MemecoinSDK {
     return BigInt(result)
   }
 
+  private async estimateSwapCoin(params: EstimateSwapCoinParams): Promise<bigint> {
+    const { fromToken, toToken, amountIn } = params
+
+    const response = await fetch(`${this.apiBaseUrl}/api/trades/estimate-swap`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fromToken,
+        toToken,
+        amountIn: amountIn.toString()
+      })
+    })
+
+    const result = await response.json()
+
+    if (!isValidBigIntString(result)) {
+      throw new Error('Invalid response format')
+    }
+
+    return BigInt(result)
+  }
+
+  async estimateSwap(params: EstimateSwapParams): Promise<bigint> {
+    const { fromToken, toToken, amountIn } = params
+
+    if (fromToken === 'eth') {
+      return this.estimateBuy({ coin: toToken, amountIn, using: 'eth' })
+    } else if (toToken === 'eth') {
+      return this.estimateSell({ coin: fromToken, amountIn, using: 'eth' })
+    } else {
+      return this.estimateSwapCoin({ fromToken, toToken, amountIn })
+    }
+  }
+
   async sell(params: TradeSellParams): Promise<HexString> {
     if (isSellFrontendParams(params)) {
       if (params.coin.dexInitiated) {
@@ -758,6 +805,222 @@ export class MemecoinSDK {
       })
 
       return receipt.transactionHash
+    }
+  }
+
+  private async swapCoinFrontend(params: SwapFrontendParams): Promise<HexString> {
+    const { fromToken, toToken, amountIn, amountOut, slippage, affiliate } = params
+
+    const walletClient = await this.walletClient
+
+    if (fromToken === 'eth' || toToken === 'eth') {
+      throw new Error('ETH is not supported as a fromToken or toToken')
+    }
+
+    const { allowance } = params
+
+    const amountOutMin = this.calculateMinAmountWithSlippage(amountOut, slippage)
+
+    const approveContractCall = {
+      address: fromToken.contractAddress,
+      abi: [
+        {
+          inputs: [
+            { name: 'spender', type: 'address' },
+            { name: 'amount', type: 'uint256' }
+          ],
+          name: 'approve',
+          outputs: [{ name: '', type: 'bool' }],
+          stateMutability: 'nonpayable',
+          type: 'function'
+        }
+      ],
+      functionName: 'approve',
+      args: [MEME_V3.MEME_SWAP, amountIn]
+    } as const
+
+    const swapContractCall = {
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+      abi: SWAP_MEMECOIN_ABI as Abi,
+      address: MEME_V3.MEME_SWAP,
+      functionName: 'swap',
+      args: [
+        fromToken.contractAddress,
+        toToken.contractAddress,
+        amountIn,
+        BigInt(amountOutMin),
+        affiliate ?? FEE_COLLECTOR
+      ]
+    } as const
+
+    const account = walletClient.account
+    if (isNull(account)) {
+      throw new Error('No account found')
+    }
+
+    let batchSupported = false
+    try {
+      const capabilities = await this.capabilities
+      batchSupported = isBatchSupported(capabilities)
+    } catch {
+      batchSupported = false
+    }
+
+    if (batchSupported) {
+      const result = await writeContracts(walletClient, {
+        contracts: [
+          // approve
+          ...(allowance < amountIn ? [approveContractCall] : []),
+          // swap
+          swapContractCall
+        ],
+        account,
+        chain: base
+      })
+
+      let status, receipts
+      const extendedWalletClient = walletClient.extend(eip5792Actions())
+      do {
+        ;({ status, receipts } = await extendedWalletClient.getCallsStatus({
+          id: result
+        }))
+        if (status !== 'CONFIRMED') {
+          await new Promise((resolve) => setTimeout(resolve, 1000))
+        }
+      } while (status !== 'CONFIRMED')
+
+      if (isNull(receipts) || receipts.length === 0) {
+        throw new Error('Transaction failed')
+      }
+
+      const lastReceipt = receipts[receipts.length - 1]
+      if (isNull(lastReceipt)) {
+        throw new Error('Transaction failed')
+      }
+
+      if (isNull(lastReceipt.transactionHash)) {
+        throw new Error('Transaction reverted')
+      }
+
+      return lastReceipt.transactionHash
+    } else {
+      if (allowance < amountIn) {
+        const data = encodeFunctionData(approveContractCall)
+        const txParams = {
+          to: fromToken.contractAddress,
+          data,
+          account,
+          chain: base
+        }
+
+        const gas = ((await this.publicClient.estimateGas(txParams)) * 125n) / 100n
+
+        const approveTx = await walletClient.sendTransaction({
+          ...txParams,
+          gas
+        })
+
+        await this.publicClient.waitForTransactionReceipt({
+          hash: approveTx,
+          confirmations: 2
+        })
+      }
+
+      const data = encodeFunctionData(swapContractCall)
+
+      const txParams = {
+        to: MEME_V3.MEME_SWAP,
+        data,
+        account,
+        chain: base
+      }
+
+      const gas = ((await this.publicClient.estimateGas(txParams)) * 125n) / 100n
+
+      const tx = await walletClient.sendTransaction({
+        ...txParams,
+        gas
+      })
+
+      const receipt = await this.publicClient.waitForTransactionReceipt({
+        hash: tx,
+        confirmations: 3
+      })
+
+      return receipt.transactionHash
+    }
+  }
+
+  async swap(params: TradeSwapParams): Promise<HexString> {
+    const { fromToken, toToken } = params
+
+    if (fromToken === 'eth') {
+      if (isSwapFrontendParams(params)) {
+        return this.buy({
+          ...params,
+          coin: toToken,
+          using: 'eth'
+        })
+      } else {
+        const to = toToken
+        if (isEthAddressOrEth(to)) {
+          return this.buy({
+            ...params,
+            coin: to,
+            using: 'eth'
+          })
+        } else {
+          throw new Error('Invalid swap params')
+        }
+      }
+    } else if (toToken === 'eth') {
+      if (isSwapFrontendParams(params)) {
+        return this.sell({
+          ...params,
+          coin: fromToken,
+          using: 'eth'
+        })
+      } else {
+        const from = fromToken
+        if (isEthAddressOrEth(from)) {
+          return this.sell({
+            ...params,
+            coin: from,
+            using: 'eth'
+          })
+        } else {
+          throw new Error('Invalid swap params')
+        }
+      }
+    } else {
+      if (isSwapFrontendParams(params)) {
+        return this.swapCoinFrontend(params)
+      } else {
+        if (params.toToken === 'eth') {
+          throw new Error('ETH is not supported as a toToken')
+        }
+
+        const walletClient = await this.walletClient
+        const address = walletClient.account?.address
+        if (isNull(address)) {
+          throw new Error('No account found')
+        }
+
+        const [from, to, amountOut, allowance] = await Promise.all([
+          this.getCoin(params.fromToken),
+          this.getCoin(params.toToken),
+          this.estimateSwap(params),
+          this.getERC20Allowance(params.fromToken, MEME_V3.MEME_SWAP, address)
+        ])
+
+        return this.swapCoinFrontend({
+          ...params,
+          fromToken: from,
+          toToken: to,
+          allowance,
+          amountOut
+        })
+      }
     }
   }
 

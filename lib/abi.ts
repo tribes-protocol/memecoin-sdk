@@ -110,3 +110,23 @@ export const SWAP_EXACT_TOKENS_FOR_ETH_ABI = [
     type: 'function'
   }
 ]
+
+export const SWAP_MEMECOIN_ABI = [
+  {
+    type: 'function',
+    name: 'swap',
+    inputs: [
+      { name: 'fromToken', type: 'address', internalType: 'address' },
+      { name: 'toToken', type: 'address', internalType: 'address' },
+      { name: 'amountIn', type: 'uint256', internalType: 'uint256' },
+      {
+        name: 'minAmountOut',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      { name: '_affiliate', type: 'address', internalType: 'address' }
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable'
+  }
+]
