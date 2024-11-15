@@ -16,8 +16,8 @@ import {
 } from '@/types'
 import { getUniswapPair } from '@/uniswap'
 import { Pair } from '@uniswap/v2-sdk'
-import { createContext, ReactNode, useCallback, useContext, useMemo } from 'react'
-import { usePublicClient, useWalletClient } from 'wagmi'
+import { createContext, ReactNode, useContext, useMemo } from 'react'
+import { useWalletClient } from 'wagmi'
 
 interface MemecoinContextType {
   getCoin: (id: EthAddress | number) => Promise<HydratedCoin>
@@ -60,7 +60,6 @@ export const MemecoinProvider = ({
   apiBaseUrl
 }: MemecoinProviderProps): ReactNode => {
   const { data: walletClient } = useWalletClient()
-  const publicClient = usePublicClient()
 
   const memecoin = useMemo(
     () =>
@@ -70,11 +69,6 @@ export const MemecoinProvider = ({
         apiBaseUrl
       }),
     [walletClient, rpcUrl]
-  )
-
-  const getUniswapDexPair = useCallback(
-    (coin: EthAddress): Promise<Pair> => getUniswapPair(coin, publicClient),
-    [publicClient]
   )
 
   const contextValue = useMemo(
@@ -88,11 +82,11 @@ export const MemecoinProvider = ({
       sell: memecoin.sell.bind(memecoin),
       swap: memecoin.swap.bind(memecoin),
       launchCoin: memecoin.launch.bind(memecoin),
-      getPair: getUniswapDexPair,
+      getPair: (coin: EthAddress) => getUniswapPair(coin, memecoin.publicClient),
       getERC20Allowance: memecoin.getERC20Allowance.bind(memecoin),
       buyMany: memecoin.buyManyMemecoins.bind(memecoin)
     }),
-    [memecoin, getUniswapDexPair]
+    [memecoin]
   )
 
   return <MemecoinContext.Provider value={contextValue}>{children}</MemecoinContext.Provider>

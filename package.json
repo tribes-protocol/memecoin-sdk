@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsup lib/index.ts --dts",
+    "build": "tsup lib/index.ts --format cjs,esm --dts",
     "test": "vitest run",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
     "format": "prettier --write .",
