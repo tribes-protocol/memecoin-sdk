@@ -12,7 +12,6 @@ import {
   getSellTokensABI,
   INITIAL_RESERVE,
   INITIAL_SUPPLY,
-  isBatchSupported,
   MEME_V3,
   UNISWAP_V2_ROUTER,
   UNISWAP_V2_ROUTER_PROXY,
@@ -20,6 +19,7 @@ import {
 } from '@/constants'
 import {
   encodeOnchainData,
+  isBatchSupported,
   isNull,
   isRequiredNumber,
   isRequiredString,
@@ -74,16 +74,40 @@ const FEE_COLLECTOR = CURRENT_MEME_INFO.FEE_COLLECTOR
 const slippageTolerance = new Percent('500', '10000')
 
 export class MemecoinSDK {
+  private readonly config: MemecoinSDKConfig
   private readonly rpcUrl: string
   private readonly apiBaseUrl: string
-  private readonly walletClient: Promise<WalletClient>
   private teamFee: Promise<bigint> = Promise.resolve(200000000000000n)
   private teamFeeInterval: NodeJS.Timeout
-  private capabilities: Promise<WalletCapabilitiesRecord<WalletCapabilities, number>>
+
+  private get walletClient(): WalletClient {
+    if ('walletClient' in this.config && this.config.walletClient) {
+      return this.config.walletClient
+    } else if ('privateKey' in this.config && this.config.privateKey) {
+      return createWalletClient({
+        account: privateKeyToAccount(this.config.privateKey),
+        chain: base,
+        transport: http(this.rpcUrl)
+      })
+    } else {
+      throw new Error('Wallet client is required for write operations')
+    }
+  }
+
+  private get capabilities(): Promise<WalletCapabilitiesRecord<WalletCapabilities, number>> {
+    return new Promise<WalletCapabilitiesRecord<WalletCapabilities, number>>((resolve, reject) => {
+      if ('walletClient' in this.config && this.config.walletClient) {
+        resolve(getCapabilities(this.config.walletClient))
+      } else {
+        reject(new Error('Wallet client is required for write operations'))
+      }
+    })
+  }
 
   public readonly publicClient: PublicClient
 
   constructor(config: MemecoinSDKConfig) {
+    this.config = config
     this.rpcUrl = config.rpcUrl
     this.apiBaseUrl = config.apiBaseUrl ?? API_BASE_URL
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
@@ -91,32 +115,6 @@ export class MemecoinSDK {
       chain: base,
       transport: http(this.rpcUrl)
     }) as PublicClient
-
-    this.walletClient = new Promise<WalletClient>((resolve, reject) => {
-      if ('walletClient' in config && config.walletClient) {
-        resolve(config.walletClient)
-      } else if ('privateKey' in config && config.privateKey) {
-        resolve(
-          createWalletClient({
-            account: privateKeyToAccount(config.privateKey),
-            chain: base,
-            transport: http(this.rpcUrl)
-          })
-        )
-      } else {
-        reject(new Error('Wallet client is required for write operations'))
-      }
-    })
-
-    this.capabilities = new Promise<WalletCapabilitiesRecord<WalletCapabilities, number>>(
-      (resolve, reject) => {
-        if ('walletClient' in config && config.walletClient) {
-          resolve(getCapabilities(config.walletClient))
-        } else {
-          reject(new Error('Wallet client is required for write operations'))
-        }
-      }
-    )
 
     void this.refreshTeamFee()
     this.teamFeeInterval = setInterval(() => this.refreshTeamFee(), 15 * 60 * 1000)
@@ -230,10 +228,22 @@ export class MemecoinSDK {
     }
   }
 
+  private async isBatchSupported(): Promise<boolean> {
+    let batchSupported = false
+    try {
+      const capabilities = await this.capabilities
+      batchSupported = isBatchSupported(capabilities)
+    } catch {
+      batchSupported = false
+    }
+
+    return batchSupported
+  }
+
   private async buyFromUniswap(params: BuyFrontendParams): Promise<HexString> {
     const { coin, amountIn: ethAmount, slippage, pair } = params
 
-    const walletClient = await this.walletClient
+    const walletClient = this.walletClient
     const token = new Token(ChainId.BASE, coin.contractAddress, 18)
     const weth = WETH9[ChainId.BASE]
     if (isNull(weth)) {
@@ -278,15 +288,7 @@ export class MemecoinSDK {
       chain: base
     }
 
-    let batchSupported = false
-    try {
-      const capabilities = await this.capabilities
-      batchSupported = isBatchSupported(capabilities)
-    } catch {
-      batchSupported = false
-    }
-
-    const tx = batchSupported
+    const tx = (await this.isBatchSupported())
       ? await walletClient.sendTransaction(txParams)
       : await walletClient.sendTransaction({
           ...txParams,
@@ -302,7 +304,7 @@ export class MemecoinSDK {
   }
 
   private async buyFromMemecoin(params: BuyFrontendParams): Promise<HexString> {
-    const walletClient = await this.walletClient
+    const walletClient = this.walletClient
 
     const { coin, amountIn, amountOut, affiliate, slippage, lockingDays } = params
 
@@ -322,14 +324,6 @@ export class MemecoinSDK {
       BigInt(lockingDays ?? 0)
     ]
 
-    let batchSupported = false
-    try {
-      const capabilities = await this.capabilities
-      batchSupported = isBatchSupported(capabilities)
-    } catch {
-      batchSupported = false
-    }
-
     const data = encodeFunctionData({
       abi,
       functionName: 'buyTokens',
@@ -344,7 +338,7 @@ export class MemecoinSDK {
       chain: base
     }
 
-    const tx = batchSupported
+    const tx = (await this.isBatchSupported())
       ? await walletClient.sendTransaction(txParams)
       : await walletClient.sendTransaction({
           ...txParams,
@@ -360,7 +354,7 @@ export class MemecoinSDK {
   }
 
   async buyManyMemecoins(params: BuyManyParams): Promise<HexString> {
-    const walletClient = await this.walletClient
+    const walletClient = this.walletClient
 
     const { memeCoins, ethAmounts, expectedTokensAmounts, affiliate, lockingDays } = params
 
@@ -415,15 +409,7 @@ export class MemecoinSDK {
       chain: base
     }
 
-    let batchSupported = false
-    try {
-      const capabilities = await this.capabilities
-      batchSupported = isBatchSupported(capabilities)
-    } catch {
-      batchSupported = false
-    }
-
-    const tx = batchSupported
+    const tx = (await this.isBatchSupported())
       ? await walletClient.sendTransaction(txParams)
       : await walletClient.sendTransaction({
           ...txParams,
@@ -514,7 +500,7 @@ export class MemecoinSDK {
         })
       ])
 
-      const walletClient = await this.walletClient
+      const walletClient = this.walletClient
       const address = walletClient.account?.address
       if (isNull(address)) {
         throw new Error('No account found')
@@ -541,7 +527,7 @@ export class MemecoinSDK {
   private async sellFromUniswap(params: SellFrontendParams): Promise<HexString> {
     const { coin, amountIn: tokenAmount, amountOut, slippage, pair, allowance } = params
 
-    const walletClient = await this.walletClient
+    const walletClient = this.walletClient
 
     const token = new Token(ChainId.BASE, coin.contractAddress, 18)
     const weth = WETH9[ChainId.BASE]
@@ -603,15 +589,7 @@ export class MemecoinSDK {
       throw new Error('No account found')
     }
 
-    let batchSupported = false
-    try {
-      const capabilities = await this.capabilities
-      batchSupported = isBatchSupported(capabilities)
-    } catch {
-      batchSupported = false
-    }
-
-    if (batchSupported) {
+    if (await this.isBatchSupported()) {
       const result = await writeContracts(walletClient, {
         contracts: [
           // approve
@@ -700,7 +678,7 @@ export class MemecoinSDK {
   private async sellFromMemecoin(params: SellFrontendParams): Promise<HexString> {
     const { coin, amountIn, amountOut, affiliate, slippage, allowance } = params
 
-    const walletClient = await this.walletClient
+    const walletClient = this.walletClient
 
     const minETHAmount = this.calculateMinAmountWithSlippage(amountOut, slippage)
 
@@ -730,15 +708,7 @@ export class MemecoinSDK {
       args: [coin.contractAddress, amountIn, minETHAmount, affiliate ?? FEE_COLLECTOR]
     }
 
-    let batchSupported = false
-    try {
-      const capabilities = await this.capabilities
-      batchSupported = isBatchSupported(capabilities)
-    } catch {
-      batchSupported = false
-    }
-
-    if (batchSupported) {
+    if (await this.isBatchSupported()) {
       const result = await writeContracts(walletClient, {
         contracts: [...(allowance < amountIn ? [approveContractCall] : []), sellContractCall],
         chain: base,
@@ -818,7 +788,7 @@ export class MemecoinSDK {
   private async swapCoinFrontend(params: SwapFrontendParams): Promise<HexString> {
     const { fromToken, toToken, amountIn, amountOut, slippage, affiliate } = params
 
-    const walletClient = await this.walletClient
+    const walletClient = this.walletClient
 
     if (fromToken === 'eth' || toToken === 'eth') {
       throw new Error('ETH is not supported as a fromToken or toToken')
@@ -865,15 +835,7 @@ export class MemecoinSDK {
       throw new Error('No account found')
     }
 
-    let batchSupported = false
-    try {
-      const capabilities = await this.capabilities
-      batchSupported = isBatchSupported(capabilities)
-    } catch {
-      batchSupported = false
-    }
-
-    if (batchSupported) {
+    if (await this.isBatchSupported()) {
       const result = await writeContracts(walletClient, {
         contracts: [
           // approve
@@ -1007,7 +969,7 @@ export class MemecoinSDK {
           throw new Error('ETH is not supported as a toToken')
         }
 
-        const walletClient = await this.walletClient
+        const walletClient = this.walletClient
         const address = walletClient.account?.address
         if (isNull(address)) {
           throw new Error('No account found')
@@ -1032,7 +994,7 @@ export class MemecoinSDK {
   }
 
   async launch(params: LaunchCoinParams): Promise<LaunchCoinResponse> {
-    const walletClient = await this.walletClient
+    const walletClient = this.walletClient
 
     const teamFee = await this.teamFee
 
