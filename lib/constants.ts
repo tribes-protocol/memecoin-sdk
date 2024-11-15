@@ -6,7 +6,7 @@ import {
   SWAP_MEMECOIN_ABI
 } from '@/abi'
 import { ABI, EthAddress, EthAddressSchema } from '@/types'
-import { parseUnits, WalletCapabilities } from 'viem'
+import { parseUnits } from 'viem'
 import { z } from 'zod'
 
 export const API_BASE_URL = 'https://memecoin.new'
@@ -95,22 +95,10 @@ export const UNISWAP_V2_ROUTER_PROXY = EthAddressSchema.parse(
   '0xa9BDdCB6dD4d3657532F346016F0220c0BabEf8E'
 )
 
-const CapabilitiesSchema = z.object({
+export const CapabilitiesSchema = z.object({
   [BASE_CHAIN_ID]: z.object({
     atomicBatch: z.object({
       supported: z.boolean()
     })
   })
 })
-
-export function isBatchSupported(
-  capabilities: { [x: number]: WalletCapabilities } | undefined
-): boolean {
-  try {
-    const parsedCapabilities = CapabilitiesSchema.parse(capabilities)
-    return parsedCapabilities[BASE_CHAIN_ID].atomicBatch.supported
-  } catch {
-    console.error('Failed to parse capabilities', capabilities)
-    return false
-  }
-}

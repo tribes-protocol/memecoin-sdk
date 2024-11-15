@@ -1,4 +1,6 @@
+import { BASE_CHAIN_ID, CapabilitiesSchema } from '@/constants'
 import { OnchainData } from '@/types'
+import { WalletCapabilities } from 'viem'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function ensureString(value: any, message: string | undefined = undefined): string {
@@ -66,4 +68,15 @@ export function encodeOnchainData(data: OnchainData): string {
     data.discord,
     data.description
   ].join(separator)
+}
+
+export function isBatchSupported(
+  capabilities: { [x: number]: WalletCapabilities } | undefined
+): boolean {
+  try {
+    const parsedCapabilities = CapabilitiesSchema.parse(capabilities)
+    return parsedCapabilities[BASE_CHAIN_ID].atomicBatch.supported
+  } catch {
+    return false
+  }
 }

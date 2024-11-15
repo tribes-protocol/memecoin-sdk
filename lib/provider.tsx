@@ -16,7 +16,7 @@ import {
 } from '@/types'
 import { getUniswapPair } from '@/uniswap'
 import { Pair } from '@uniswap/v2-sdk'
-import { createContext, ReactNode, useContext, useMemo } from 'react'
+import { createContext, ReactNode, useContext } from 'react'
 import { useWalletClient } from 'wagmi'
 
 interface MemecoinContextType {
@@ -61,33 +61,26 @@ export const MemecoinProvider = ({
 }: MemecoinProviderProps): ReactNode => {
   const { data: walletClient } = useWalletClient()
 
-  const memecoin = useMemo(
-    () =>
-      new MemecoinSDK({
-        walletClient,
-        rpcUrl,
-        apiBaseUrl
-      }),
-    [walletClient, rpcUrl]
-  )
+  const sdk = new MemecoinSDK({
+    walletClient,
+    rpcUrl,
+    apiBaseUrl
+  })
 
-  const contextValue = useMemo(
-    () => ({
-      getCoin: memecoin.getCoin.bind(memecoin),
-      getTrending: memecoin.getTrending.bind(memecoin),
-      estimateSwap: memecoin.estimateSwap.bind(memecoin),
-      estimateBuy: memecoin.estimateBuy.bind(memecoin),
-      buy: memecoin.buy.bind(memecoin),
-      estimateSell: memecoin.estimateSell.bind(memecoin),
-      sell: memecoin.sell.bind(memecoin),
-      swap: memecoin.swap.bind(memecoin),
-      launchCoin: memecoin.launch.bind(memecoin),
-      getPair: (coin: EthAddress) => getUniswapPair(coin, memecoin.publicClient),
-      getERC20Allowance: memecoin.getERC20Allowance.bind(memecoin),
-      buyMany: memecoin.buyManyMemecoins.bind(memecoin)
-    }),
-    [memecoin]
-  )
+  const contextValue = {
+    getCoin: sdk.getCoin.bind(sdk),
+    getTrending: sdk.getTrending.bind(sdk),
+    estimateSwap: sdk.estimateSwap.bind(sdk),
+    estimateBuy: sdk.estimateBuy.bind(sdk),
+    buy: sdk.buy.bind(sdk),
+    estimateSell: sdk.estimateSell.bind(sdk),
+    sell: sdk.sell.bind(sdk),
+    swap: sdk.swap.bind(sdk),
+    launchCoin: sdk.launch.bind(sdk),
+    getPair: (coin: EthAddress) => getUniswapPair(coin, sdk.publicClient),
+    getERC20Allowance: sdk.getERC20Allowance.bind(sdk),
+    buyMany: sdk.buyManyMemecoins.bind(sdk)
+  }
 
   return <MemecoinContext.Provider value={contextValue}>{children}</MemecoinContext.Provider>
 }
