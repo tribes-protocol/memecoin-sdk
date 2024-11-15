@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.5
+
+### Patch Changes
+
+- 3df3c25: fix capabilities logging
+
 ## 0.0.4
 
 ### Patch Changes
