@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.6
+
+### Patch Changes
+
+- f98a3b1: fix walletClient issue
+
 ## 0.0.5
 
 ### Patch Changes
