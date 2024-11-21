@@ -229,3 +229,39 @@ Generates a new Memecoin based on a given prompt.
 Launches a newly generated Memecoin with specified properties.
 
 ---
+
+### Local testing
+
+To link locally and test
+
+1. install yalc
+
+```bash
+npm install -g yalc
+```
+
+2. build and publish the local package
+
+```bash
+bun run build
+yalc publish
+```
+
+3. in the project you want to test against, link the local package
+
+```bash
+yalc add @memecoin/sdk
+bun install
+```
+
+4. if you make changes to the local package, run `yalc publish` again
+
+```bash
+yalc publish --push
+```
+
+install dependencies
+
+```bash
+bun install
+```

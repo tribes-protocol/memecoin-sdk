@@ -34,7 +34,7 @@ export type MemecoinSDKConfig =
       privateKey?: HexString
     })
 
-export interface LaunchCoinParams {
+interface LaunchCoinParamsBase {
   name: string
   ticker: string
   antiSnipeAmount: bigint
@@ -46,6 +46,14 @@ export interface LaunchCoinParams {
   description: string
   lockingDays?: number
 }
+
+export interface LaunchCoinParamsFrontend extends LaunchCoinParamsBase {
+  walletClient: WalletClient
+}
+
+interface LaunchCoinParamsBackend extends LaunchCoinParamsBase {}
+
+export type LaunchCoinParams = LaunchCoinParamsFrontend | LaunchCoinParamsBackend
 
 export interface LaunchCoinResponse {
   contractAddress: EthAddress
@@ -149,6 +157,7 @@ export interface BaseSellParams {
 
 export interface SellFrontendParams extends BaseSellParams {
   coin: HydratedCoin
+  walletClient: WalletClient
   amountOut: bigint
   allowance: bigint
   pair?: Pair
@@ -161,7 +170,7 @@ export interface SellBackendParams extends BaseSellParams {
 export type TradeSellParams = SellFrontendParams | SellBackendParams
 
 export function isSellFrontendParams(params: TradeSellParams): params is SellFrontendParams {
-  return !isRequiredString(params.coin) && 'amountOut' in params
+  return !isRequiredString(params.coin) && 'amountOut' in params && 'walletClient' in params
 }
 
 export interface BaseBuyParams {
@@ -175,6 +184,7 @@ export interface BaseBuyParams {
 export interface BuyFrontendParams extends BaseBuyParams {
   coin: HydratedCoin
   amountOut: bigint
+  walletClient: WalletClient
   pair?: Pair
 }
 
@@ -185,16 +195,24 @@ export interface BuyBackendParams extends BaseBuyParams {
 export type TradeBuyParams = BuyFrontendParams | BuyBackendParams
 
 export function isBuyFrontendParams(params: TradeBuyParams): params is BuyFrontendParams {
-  return !isRequiredString(params.coin) && 'amountOut' in params
+  return !isRequiredString(params.coin) && 'amountOut' in params && 'walletClient' in params
 }
 
-export interface BuyManyParams {
+interface BuyManyParamsBase {
   memeCoins: (EthAddress | HydratedCoin)[]
   ethAmounts: bigint[]
   expectedTokensAmounts: bigint[]
   affiliate?: EthAddress
   lockingDays?: number
 }
+
+export interface BuyManyParamsFrontend extends BuyManyParamsBase {
+  walletClient: WalletClient
+}
+
+export interface BuyManyParamsBackend extends BuyManyParamsBase {}
+
+export type BuyManyParams = BuyManyParamsFrontend | BuyManyParamsBackend
 
 export function isBuyManyParams(params: BuyManyParams): params is BuyManyParams {
   return params.memeCoins.every((coin) => !isRequiredString(coin))
@@ -226,6 +244,7 @@ export type EstimateSwapParams =
 
 export type SwapFrontendParams =
   | {
+      walletClient: WalletClient
       fromToken: HydratedCoin
       toToken: HydratedCoin | 'eth'
       amountIn: bigint
@@ -236,6 +255,7 @@ export type SwapFrontendParams =
       pair?: Pair
     }
   | {
+      walletClient: WalletClient
       fromToken: 'eth'
       toToken: HydratedCoin
       amountIn: bigint
@@ -268,6 +288,7 @@ export type TradeSwapParams = SwapFrontendParams | SwapBackendParams
 export function isSwapFrontendParams(params: TradeSwapParams): params is SwapFrontendParams {
   return (
     'amountOut' in params &&
+    'walletClient' in params &&
     isHydratedCoinOrEth(params.fromToken) &&
     isHydratedCoinOrEth(params.toToken)
   )

@@ -214,16 +214,18 @@ export class MemecoinSDK {
         })
       ])
       let pair: Pair | undefined
+      const walletClient = this.walletClient
       if (coin.dexInitiated) {
         pair = await getUniswapPair(coin.contractAddress, this.publicClient)
         return this.buyFromUniswap({
           ...params,
           coin,
           amountOut,
-          pair
+          pair,
+          walletClient
         })
       } else {
-        return this.buyFromMemecoin({ ...params, coin, amountOut })
+        return this.buyFromMemecoin({ ...params, coin, amountOut, walletClient })
       }
     }
   }
@@ -241,9 +243,8 @@ export class MemecoinSDK {
   }
 
   private async buyFromUniswap(params: BuyFrontendParams): Promise<HexString> {
-    const { coin, amountIn: ethAmount, slippage, pair } = params
+    const { coin, amountIn: ethAmount, slippage, pair, walletClient } = params
 
-    const walletClient = this.walletClient
     const token = new Token(ChainId.BASE, coin.contractAddress, 18)
     const weth = WETH9[ChainId.BASE]
     if (isNull(weth)) {
@@ -304,7 +305,7 @@ export class MemecoinSDK {
   }
 
   private async buyFromMemecoin(params: BuyFrontendParams): Promise<HexString> {
-    const walletClient = this.walletClient
+    const walletClient = params.walletClient
 
     const { coin, amountIn, amountOut, affiliate, slippage, lockingDays } = params
 
@@ -354,7 +355,7 @@ export class MemecoinSDK {
   }
 
   async buyManyMemecoins(params: BuyManyParams): Promise<HexString> {
-    const walletClient = this.walletClient
+    const walletClient = 'walletClient' in params ? params.walletClient : this.walletClient
 
     const { memeCoins, ethAmounts, expectedTokensAmounts, affiliate, lockingDays } = params
 
@@ -516,18 +517,25 @@ export class MemecoinSDK {
           coin,
           amountOut,
           pair,
-          allowance
+          allowance,
+          walletClient
         })
       } else {
-        return this.sellFromMemecoin({ ...params, coin, amountOut, allowance })
+        return this.sellFromMemecoin({ ...params, coin, amountOut, allowance, walletClient })
       }
     }
   }
 
   private async sellFromUniswap(params: SellFrontendParams): Promise<HexString> {
-    const { coin, amountIn: tokenAmount, amountOut, slippage, pair, allowance } = params
-
-    const walletClient = this.walletClient
+    const {
+      coin,
+      amountIn: tokenAmount,
+      amountOut,
+      slippage,
+      pair,
+      allowance,
+      walletClient
+    } = params
 
     const token = new Token(ChainId.BASE, coin.contractAddress, 18)
     const weth = WETH9[ChainId.BASE]
@@ -676,9 +684,7 @@ export class MemecoinSDK {
   }
 
   private async sellFromMemecoin(params: SellFrontendParams): Promise<HexString> {
-    const { coin, amountIn, amountOut, affiliate, slippage, allowance } = params
-
-    const walletClient = this.walletClient
+    const { coin, amountIn, amountOut, affiliate, slippage, allowance, walletClient } = params
 
     const minETHAmount = this.calculateMinAmountWithSlippage(amountOut, slippage)
 
@@ -786,9 +792,7 @@ export class MemecoinSDK {
   }
 
   private async swapCoinFrontend(params: SwapFrontendParams): Promise<HexString> {
-    const { fromToken, toToken, amountIn, amountOut, slippage, affiliate } = params
-
-    const walletClient = this.walletClient
+    const { fromToken, toToken, amountIn, amountOut, slippage, affiliate, walletClient } = params
 
     if (fromToken === 'eth' || toToken === 'eth') {
       throw new Error('ETH is not supported as a fromToken or toToken')
@@ -987,14 +991,15 @@ export class MemecoinSDK {
           fromToken: from,
           toToken: to,
           allowance,
-          amountOut
+          amountOut,
+          walletClient
         })
       }
     }
   }
 
   async launch(params: LaunchCoinParams): Promise<LaunchCoinResponse> {
-    const walletClient = this.walletClient
+    const walletClient = 'walletClient' in params ? params.walletClient : this.walletClient
 
     const teamFee = await this.teamFee
 
