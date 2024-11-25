@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.7
+
+### Patch Changes
+
+- 1cf7733: revert wallet client changes
+
 ## 0.0.6
 
 ### Patch Changes
