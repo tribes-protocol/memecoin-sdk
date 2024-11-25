@@ -1062,17 +1062,17 @@ export class MemecoinSDK {
     })
 
     const log = receipt.logs.find((log) => log.address.toLowerCase() === memeDeployer.toLowerCase())
-    const topic1 = log?.topics[1]
+    const topic2 = log?.topics[2]
 
     if (isNull(log)) {
       throw new Error('Failed to find logs for create coin')
     }
 
-    if (isNull(topic1)) {
-      throw Error('Failed to find topic 1')
+    if (isNull(topic2)) {
+      throw Error('Failed to find topic 2')
     }
 
-    const contractAddress = EthAddressSchema.parse(`0x${topic1.slice(26)}`)
+    const contractAddress = EthAddressSchema.parse(`0x${topic2.slice(26)}`)
 
     if (isNull(contractAddress)) {
       throw new Error('Failed to create coin')
