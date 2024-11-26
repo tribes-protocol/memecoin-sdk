@@ -1008,7 +1008,8 @@ export class MemecoinSDK {
       twitter,
       telegram,
       discord,
-      lockingDays
+      lockingDays,
+      farcasterId
     } = params
 
     const memeDeployer = CURRENT_MEME_INFO.DEPLOYER
@@ -1018,10 +1019,11 @@ export class MemecoinSDK {
     const tokenData = encodeOnchainData({
       image,
       description,
-      website: website ?? undefined,
-      twitter: twitter ?? undefined,
-      telegram: telegram ?? undefined,
-      discord: discord ?? undefined
+      website,
+      twitter,
+      telegram,
+      discord,
+      farcasterId
     })
 
     const account = walletClient.account

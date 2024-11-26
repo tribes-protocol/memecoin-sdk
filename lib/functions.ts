@@ -66,7 +66,8 @@ export function encodeOnchainData(data: OnchainData): string {
     data.twitter,
     data.telegram,
     data.discord,
-    data.description
+    data.description,
+    data.farcasterId
   ].join(separator)
 }
 

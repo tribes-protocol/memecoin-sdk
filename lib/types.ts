@@ -39,12 +39,13 @@ export interface LaunchCoinParams {
   ticker: string
   antiSnipeAmount: bigint
   image: string
-  website: string
-  twitter: string
-  telegram: string
-  discord: string
-  description: string
+  website?: string
+  twitter?: string
+  telegram?: string
+  discord?: string
+  description?: string
   lockingDays?: number
+  farcasterId?: number
 }
 
 export interface LaunchCoinResponse {
@@ -68,7 +69,8 @@ export const OnchainDataSchema = z.object({
   twitter: z.string().optional(),
   telegram: z.string().optional(),
   discord: z.string().optional(),
-  description: z.string().optional()
+  description: z.string().optional(),
+  farcasterId: z.number().optional()
 })
 
 export type OnchainData = z.infer<typeof OnchainDataSchema>
