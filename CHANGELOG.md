@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.8
+
+### Patch Changes
+
+- 12c0f0b: fix launch coin bug
+
 ## 0.0.7
 
 ### Patch Changes
