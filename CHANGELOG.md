@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.9
+
+### Patch Changes
+
+- 8cdd2b1: add farcasterId to launch coin
+
 ## 0.0.8
 
 ### Patch Changes
