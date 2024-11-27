@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.10
+
+### Patch Changes
+
+- e52e33a: Decouple client and server imports
+
 ## 0.0.9
 
 ### Patch Changes
