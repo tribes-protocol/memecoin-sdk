@@ -967,6 +967,11 @@ export class MemecoinSDK {
   }
 
   async swap(params: TradeSwapParams): Promise<HexString> {
+    const isBatchSupported = await this.isBatchSupported()
+    if (!isBatchSupported) {
+      await this.switchToBaseChain()
+    }
+
     const { fromToken, toToken } = params
 
     if (fromToken === 'eth') {
@@ -1040,6 +1045,11 @@ export class MemecoinSDK {
   }
 
   async launch(params: LaunchCoinParams): Promise<LaunchCoinResponse> {
+    const isBatchSupported = await this.isBatchSupported()
+    if (!isBatchSupported) {
+      await this.switchToBaseChain()
+    }
+
     const walletClient = this.walletClient
 
     const teamFee = await this.teamFee
