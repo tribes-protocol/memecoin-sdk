@@ -55,6 +55,7 @@ import { Pair, Route, Trade } from '@uniswap/v2-sdk'
 import BigNumber from 'bignumber.js'
 import {
   Abi,
+  Chain,
   createPublicClient,
   createWalletClient,
   encodeFunctionData,
@@ -105,14 +106,23 @@ export class MemecoinSDK {
   }
 
   public readonly publicClient: PublicClient
+  public readonly baseChain: Chain
 
   constructor(config: MemecoinSDKConfig) {
     this.config = config
     this.rpcUrl = config.rpcUrl
     this.apiBaseUrl = config.apiBaseUrl ?? API_BASE_URL
+    this.baseChain = {
+      ...base,
+      rpcUrls: {
+        default: {
+          http: [this.rpcUrl]
+        }
+      }
+    }
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     this.publicClient = createPublicClient({
-      chain: base,
+      chain: this.baseChain,
       transport: http(this.rpcUrl)
     }) as PublicClient
 
@@ -122,6 +132,27 @@ export class MemecoinSDK {
 
   destroy(): void {
     clearInterval(this.teamFeeInterval)
+  }
+
+  private async switchToBaseChain(): Promise<void> {
+    const walletClient = this.walletClient
+    const currentChain = await walletClient.getChainId()
+
+    if (currentChain === this.baseChain.id) {
+      console.log('Already on base chain')
+      return
+    }
+
+    try {
+      await walletClient.switchChain({ id: this.baseChain.id })
+    } catch (error: unknown) {
+      console.warn('Error switching to base chain', error)
+      try {
+        await walletClient.addChain({ chain: this.baseChain })
+      } catch (error: unknown) {
+        console.warn('Error adding base chain', error)
+      }
+    }
   }
 
   private async refreshTeamFee(): Promise<void> {
@@ -198,6 +229,11 @@ export class MemecoinSDK {
   }
 
   async buy(params: TradeBuyParams): Promise<HexString> {
+    const isBatchSupported = await this.isBatchSupported()
+    if (!isBatchSupported) {
+      await this.switchToBaseChain()
+    }
+
     if (isBuyFrontendParams(params)) {
       if (params.coin.dexInitiated) {
         return this.buyFromUniswap(params)
@@ -354,6 +390,11 @@ export class MemecoinSDK {
   }
 
   async buyManyMemecoins(params: BuyManyParams): Promise<HexString> {
+    const isBatchSupported = await this.isBatchSupported()
+    if (!isBatchSupported) {
+      await this.switchToBaseChain()
+    }
+
     const walletClient = this.walletClient
 
     const { memeCoins, ethAmounts, expectedTokensAmounts, affiliate, lockingDays } = params
@@ -484,6 +525,11 @@ export class MemecoinSDK {
   }
 
   async sell(params: TradeSellParams): Promise<HexString> {
+    const isBatchSupported = await this.isBatchSupported()
+    if (!isBatchSupported) {
+      await this.switchToBaseChain()
+    }
+
     if (isSellFrontendParams(params)) {
       if (params.coin.dexInitiated) {
         return this.sellFromUniswap(params)
