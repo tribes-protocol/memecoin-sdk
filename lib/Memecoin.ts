@@ -144,6 +144,7 @@ export class MemecoinSDK {
     }
 
     try {
+      console.log('attempting to switch to base chain')
       await walletClient.switchChain({ id: this.baseChain.id })
     } catch (error: unknown) {
       console.warn('Error switching to base chain', error)
