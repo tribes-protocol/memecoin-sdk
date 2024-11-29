@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.12
+
+### Patch Changes
+
+- e728ebd: added logging
+
 ## 0.0.11
 
 ### Patch Changes
