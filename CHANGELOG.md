@@ -1,5 +1,12 @@
 # @memecoin/sdk
 
+## 0.0.11
+
+### Patch Changes
+
+- 5014402: switch chains if needed
+- 7e09ce0: Make sure to switch chain for swap and launch
+
 ## 0.0.10
 
 ### Patch Changes
