@@ -32,6 +32,7 @@ import {
 } from '@/functions'
 import {
   BuyFrontendParams,
+  EstimateLaunchBuyParams,
   EstimateSwapCoinParams,
   EstimateSwapParams,
   EstimateTradeParams,
@@ -46,7 +47,6 @@ import {
   isEthAddressOrEth,
   isSellFrontendParams,
   isSwapFrontendParams,
-  LaunchCoinDirectParams,
   LaunchCoinParams,
   LaunchCoinResponse,
   LaunchResultSchema,
@@ -263,7 +263,7 @@ export class MemecoinSDK {
           coin,
           amountOut,
           pair:
-            coin.dexKind === 'uniV2'
+            coin.dexKind === 'univ2'
               ? await getUniswapPair(coin.contractAddress, this.publicClient)
               : undefined
         })
@@ -302,7 +302,7 @@ export class MemecoinSDK {
 
     const deadline = Math.floor(Date.now() / 1000) + 60 * 20
 
-    if (isNull(pair) && coin.dexKind === 'uniV2') {
+    if (isNull(pair) && coin.dexKind === 'univ2') {
       throw new Error('Pair is required for uniswap trade')
     }
 
@@ -332,16 +332,14 @@ export class MemecoinSDK {
       ]
     }
 
-    const contractParams =
-      coin.dexKind === 'uniV2'
-        ? uniswapV2SwapContractCall
-        : coin.dexKind === 'uniV3'
-          ? uniswapV3SwapContractCall
-          : undefined
-
-    if (isNull(contractParams)) {
-      throw new Error('Invalid dex kind')
-    }
+    const contractParams = (() => {
+      switch (coin.dexKind) {
+        case 'univ2':
+          return uniswapV2SwapContractCall
+        case 'univ3':
+          return uniswapV3SwapContractCall
+      }
+    })()
 
     const spender = this.getUniswapContract(coin)
 
@@ -521,7 +519,7 @@ export class MemecoinSDK {
           coin,
           amountOut,
           pair:
-            coin.dexKind === 'uniV2'
+            coin.dexKind === 'univ2'
               ? await getUniswapPair(coin.contractAddress, this.publicClient)
               : undefined,
           allowance
@@ -549,7 +547,7 @@ export class MemecoinSDK {
       throw new Error('WETH9 is not supported on this chain')
     }
 
-    if (isNull(pair) && coin.dexKind === 'uniV2') {
+    if (isNull(pair) && coin.dexKind === 'univ2') {
       throw new Error('Pair is required for uniswap trade')
     }
 
@@ -618,16 +616,14 @@ export class MemecoinSDK {
       value: fee
     } as const
 
-    const swapContractCall =
-      coin.dexKind === 'uniV2'
-        ? uniswapV2SwapContractCall
-        : coin.dexKind === 'uniV3'
-          ? uniswapV3SwapContractCall
-          : undefined
-
-    if (isNull(swapContractCall)) {
-      throw new Error('Invalid dex kind')
-    }
+    const swapContractCall = (() => {
+      switch (coin.dexKind) {
+        case 'univ2':
+          return uniswapV2SwapContractCall
+        case 'univ3':
+          return uniswapV3SwapContractCall
+      }
+    })()
 
     if (await this.isBatchSupported()) {
       const result = await writeContracts(walletClient, {
@@ -1191,7 +1187,7 @@ export class MemecoinSDK {
     return BigInt(result)
   }
 
-  async marketCapToTick(params: MarketCapToTickParams): Promise<number> {
+  async calculateDirectLaunchTick(params: MarketCapToTickParams): Promise<number> {
     const { marketCap, totalSupply, blockNumber, fee } = params
 
     const [tickSpacing, { price: ethPrice }] = await Promise.all([
@@ -1208,13 +1204,8 @@ export class MemecoinSDK {
     return roundedTick
   }
 
-  async generateSalt(params: GenerateSaltParams): Promise<HexString> {
-    const account = this.walletClient.account
-    if (isNull(account)) {
-      throw new Error('No account found')
-    }
-
-    const { name, symbol, supply, ...onchainData } = params
+  async generateDirectLaunchSalt(params: GenerateSaltParams): Promise<HexString> {
+    const { account, name, symbol, supply, ...onchainData } = params
 
     const tokenData = encodeOnchainData(onchainData)
 
@@ -1223,20 +1214,15 @@ export class MemecoinSDK {
         address: UNISWAP_V3_LAUNCHER,
         abi: UNISWAPV3_GENERATE_SALT_ABI,
         functionName: 'generateSalt',
-        args: [account.address, name, symbol, supply, tokenData]
+        args: [account, name, symbol, supply, tokenData]
       })
     )
 
     return GenerateSaltResultSchema.parse(result).salt
   }
 
-  async getExpectedOutputAmount(params: LaunchCoinDirectParams): Promise<bigint> {
-    const account = this.walletClient.account
-    if (isNull(account)) {
-      throw new Error('No account found')
-    }
-
-    const { name, ticker, antiSnipeAmount, tick, fee, salt, ...onchainData } = params
+  async estimateLaunchBuy(params: EstimateLaunchBuyParams): Promise<bigint> {
+    const { name, ticker, antiSnipeAmount, account, tick, fee, salt, ...onchainData } = params
 
     const tokenData = encodeOnchainData(onchainData)
 
@@ -1247,7 +1233,7 @@ export class MemecoinSDK {
       _initialTick: tick,
       _fee: fee,
       _salt: salt,
-      _deployer: account.address,
+      _deployer: account,
       _data: tokenData
     }
 
@@ -1288,9 +1274,9 @@ export class MemecoinSDK {
 
   private getUniswapContract(coin: HydratedCoin): EthAddress {
     switch (coin.dexKind) {
-      case 'uniV2':
+      case 'univ2':
         return UNISWAP_V2_ROUTER_PROXY
-      case 'uniV3':
+      case 'univ3':
         return UNISWAP_V3_ROUTER
     }
   }

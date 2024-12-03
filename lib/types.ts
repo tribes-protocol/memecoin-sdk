@@ -34,7 +34,7 @@ export type MemecoinSDKConfig =
       privateKey?: HexString
     })
 
-export interface LaunchCoinBaseParams {
+export interface BaseLaunchCoinParams {
   name: string
   ticker: string
   antiSnipeAmount: bigint
@@ -48,16 +48,18 @@ export interface LaunchCoinBaseParams {
   farcasterId?: number
 }
 
-export type LaunchCoinBondingCurveParams = LaunchCoinBaseParams & {
+export type LaunchCoinBondingCurveParams = BaseLaunchCoinParams & {
   kind: 'bonding-curve'
 }
 
-export type LaunchCoinDirectParams = LaunchCoinBaseParams & {
+export type LaunchCoinDirectParams = BaseLaunchCoinParams & {
   kind: 'direct'
   tick: number
   salt: HexString
   fee: number
 }
+
+export type EstimateLaunchBuyParams = LaunchCoinDirectParams & { account: EthAddress }
 
 export type LaunchCoinParams = LaunchCoinBondingCurveParams | LaunchCoinDirectParams
 
@@ -108,7 +110,7 @@ export const CoinSchema = z.object({
   name: z.string(),
   ticker: z.string(),
   description: z.string(),
-  dexKind: z.enum(['uniV2', 'uniV3']),
+  dexKind: z.enum(['univ2', 'univ3']),
   dexMetadata: z.string().nullable()
 })
 
@@ -299,6 +301,7 @@ export type GenerateSaltParams = {
   name: string
   symbol: string
   supply: bigint
+  account: EthAddress
 } & OnchainData
 
 export const LaunchResultSchema = z.tuple([EthAddressSchema, z.bigint(), z.bigint()])

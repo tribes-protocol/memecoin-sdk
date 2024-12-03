@@ -24,7 +24,7 @@ export const UNISWAP_V3_FACTORY = EthAddressSchema.parse(
 ) // BASE MAINNET UNISWAP V3 FACTORY
 
 export const UNISWAP_V3_LAUNCHER = EthAddressSchema.parse(
-  '0x4611E3Dc50BEeC07C72C6B4489Ab045DC8baD433'
+  '0x488f89cD18aED32bB83c3e3BA8445939cA7499CC'
 )
 
 export const UNISWAP_V3_ROUTER = EthAddressSchema.parse(
