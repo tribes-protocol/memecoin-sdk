@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.15
+
+### Patch Changes
+
+- 0fe6122: fix generate direct launch salt function
+
 ## 0.0.14
 
 ### Patch Changes
