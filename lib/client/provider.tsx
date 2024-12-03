@@ -3,7 +3,6 @@
 import { MemecoinSDK } from '@/Memecoin'
 import {
   BuyFrontendParams,
-  BuyManyParams,
   EstimateSwapParams,
   EstimateTradeParams,
   EthAddress,
@@ -28,7 +27,6 @@ interface MemecoinContextType {
   sell: (params: SellFrontendParams) => Promise<HexString>
   estimateSell: (params: EstimateTradeParams) => Promise<bigint>
   swap: (params: SwapFrontendParams) => Promise<HexString>
-  buyMany: (params: BuyManyParams) => Promise<HexString>
   launchCoin: (params: LaunchCoinParams) => Promise<LaunchCoinResponse>
   getPair: (coin: EthAddress) => Promise<Pair>
   getERC20Allowance: (
@@ -78,8 +76,7 @@ export const MemecoinProvider = ({
     swap: sdk.swap.bind(sdk),
     launchCoin: sdk.launch.bind(sdk),
     getPair: (coin: EthAddress) => getUniswapPair(coin, sdk.publicClient),
-    getERC20Allowance: sdk.getERC20Allowance.bind(sdk),
-    buyMany: sdk.buyManyMemecoins.bind(sdk)
+    getERC20Allowance: sdk.getERC20Allowance.bind(sdk)
   }
 
   return <MemecoinContext.Provider value={contextValue}>{children}</MemecoinContext.Provider>
