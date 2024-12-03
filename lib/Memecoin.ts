@@ -1219,7 +1219,14 @@ export class MemecoinSDK {
       })
     )
 
-    return GenerateSaltResultSchema.parse(result).salt
+    if (!Array.isArray(result)) {
+      throw new Error(`Invalid response format: ${result}`)
+    }
+
+    return GenerateSaltResultSchema.parse({
+      salt: result[0],
+      token: result[1]
+    }).salt
   }
 
   async estimateLaunchBuy(params: EstimateLaunchBuyParams): Promise<bigint> {

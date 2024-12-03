@@ -46,6 +46,7 @@ export interface BaseLaunchCoinParams {
   description?: string
   lockingDays?: number
   farcasterId?: number
+  farcaster?: string
 }
 
 export type LaunchCoinBondingCurveParams = BaseLaunchCoinParams & {
