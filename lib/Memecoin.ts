@@ -321,10 +321,9 @@ export class MemecoinSDK {
           tokenOut: token.address,
           fee: 10000,
           recipient: account.address,
-          deadline,
           amountIn: ethAmount,
           amountOutMinimum: amountOutMin,
-          sqrtPriceLimitX96: 0
+          sqrtPriceLimitX96: 0n
         }
       ]
     }
@@ -692,7 +691,6 @@ export class MemecoinSDK {
         }
 
         const gas = ((await this.publicClient.estimateGas(txParams)) * 125n) / 100n
-
         const approveTx = await walletClient.sendTransaction({
           ...txParams,
           gas
@@ -720,7 +718,6 @@ export class MemecoinSDK {
         ...txParams,
         gas
       })
-
       const receipt = await this.publicClient.waitForTransactionReceipt({
         hash: tx,
         confirmations: 3
