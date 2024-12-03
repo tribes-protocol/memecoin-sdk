@@ -2,6 +2,7 @@ import {
   SWAP_EXACT_ETH_FOR_TOKENS_ABI,
   SWAP_EXACT_TOKENS_FOR_ETH_ABI,
   SWAP_MEMECOIN_ABI,
+  UNISWAP_V3_SWAP_ABI,
   UNISWAPV3_GENERATE_SALT_ABI,
   UNISWAPV3_LAUNCH_ABI
 } from '@/abi'
@@ -18,6 +19,7 @@ import {
   UNISWAP_V2_ROUTER,
   UNISWAP_V2_ROUTER_PROXY,
   UNISWAP_V3_LAUNCHER,
+  UNISWAP_V3_ROUTER,
   WETH_TOKEN
 } from '@/constants'
 import {
@@ -53,8 +55,8 @@ import {
   TradeSwapParams
 } from '@/types'
 import { fetchEthereumPrice, getUniswapPair, getUniswapV3TickSpacing } from '@/uniswap'
-import { ChainId, CurrencyAmount, Percent, Token, WETH9 } from '@uniswap/sdk-core'
-import { Pair, Route, Trade } from '@uniswap/v2-sdk'
+import { ChainId, Token, WETH9 } from '@uniswap/sdk-core'
+import { Pair } from '@uniswap/v2-sdk'
 import BigNumber from 'bignumber.js'
 import {
   Abi,
@@ -75,8 +77,6 @@ import { base } from 'viem/chains'
 import { eip5792Actions, getCapabilities, writeContracts } from 'viem/experimental'
 
 const FEE_COLLECTOR = CURRENT_MEME_INFO.FEE_COLLECTOR
-
-const slippageTolerance = new Percent('500', '10000')
 
 export class MemecoinSDK {
   private readonly config: MemecoinSDKConfig
@@ -282,7 +282,7 @@ export class MemecoinSDK {
   }
 
   private async buyFromUniswap(params: BuyFrontendParams): Promise<HexString> {
-    const { coin, amountIn: ethAmount, slippage, pair } = params
+    const { coin, amountIn: ethAmount, slippage, pair, amountOut } = params
 
     const walletClient = this.walletClient
     const token = new Token(ChainId.BASE, coin.contractAddress, 18)
@@ -291,38 +291,70 @@ export class MemecoinSDK {
       throw new Error('WETH9 is not supported on this chain')
     }
 
-    if (isNull(pair)) {
-      throw new Error('Pair is required for uniswap trade')
-    }
-
-    const route = new Route([pair], weth, token)
-    const amountIn = CurrencyAmount.fromRawAmount(weth, ethAmount.toString())
-    const trade = Trade.exactIn(route, amountIn)
-
-    const slippageTolerancePercent = slippage
-      ? new Percent(slippage.toString(), '100')
-      : slippageTolerance
-
-    const amountOutMin = trade.minimumAmountOut(slippageTolerancePercent).quotient.toString()
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 20
-
-    const fee = (ethAmount * 17n) / 1000n // 1.7% fee
-
     const account = walletClient.account
     if (isNull(account)) {
       throw new Error('No account found')
     }
 
-    const contractParams = {
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 20
+
+    if (isNull(pair) && coin.dexKind === 'uniV2') {
+      throw new Error('Pair is required for uniswap trade')
+    }
+
+    const amountOutMin = this.calculateMinAmountWithSlippage(amountOut, slippage)
+
+    const fee = (ethAmount * 17n) / 1000n // 1.7% fee
+
+    const uniswapV2SwapContractCall = {
       abi: SWAP_EXACT_ETH_FOR_TOKENS_ABI,
       functionName: 'swapExactETHForTokens',
       args: [token.address, amountOutMin, deadline, fee]
     }
 
+    const uniswapV3SwapContractCall = {
+      abi: UNISWAP_V3_SWAP_ABI,
+      functionName: 'exactInputSingle',
+      args: [
+        {
+          tokenIn: WETH_TOKEN,
+          tokenOut: token.address,
+          fee: 10000,
+          recipient: account.address,
+          deadline,
+          amountIn: ethAmount,
+          amountOutMinimum: amountOutMin,
+          sqrtPriceLimitX96: 0
+        }
+      ]
+    }
+
+    const contractParams =
+      coin.dexKind === 'uniV2'
+        ? uniswapV2SwapContractCall
+        : coin.dexKind === 'uniV3'
+          ? uniswapV3SwapContractCall
+          : undefined
+
+    if (isNull(contractParams)) {
+      throw new Error('Invalid dex kind')
+    }
+
+    const spender =
+      coin.dexKind === 'uniV2'
+        ? UNISWAP_V2_ROUTER_PROXY
+        : coin.dexKind === 'uniV3'
+          ? UNISWAP_V3_ROUTER
+          : undefined
+
+    if (isNull(spender)) {
+      throw new Error('Invalid dex kind')
+    }
+
     const data = encodeFunctionData(contractParams)
 
     const txParams = {
-      to: UNISWAP_V2_ROUTER_PROXY,
+      to: spender,
       data,
       value: ethAmount,
       account,
@@ -523,19 +555,23 @@ export class MemecoinSDK {
       throw new Error('WETH9 is not supported on this chain')
     }
 
-    if (isNull(pair)) {
+    if (isNull(pair) && coin.dexKind === 'uniV2') {
       throw new Error('Pair is required for uniswap trade')
     }
 
-    const route = new Route([pair], token, weth)
-    const amountIn = CurrencyAmount.fromRawAmount(token, tokenAmount.toString())
-    const trade = Trade.exactIn(route, amountIn)
-
-    const slippageTolerancePercent = slippage
-      ? new Percent(slippage.toString(), '100')
-      : slippageTolerance
-    const amountOutMin = trade.minimumAmountOut(slippageTolerancePercent).quotient.toString()
+    const amountOutMin = this.calculateMinAmountWithSlippage(amountOut, slippage)
     const deadline = Math.floor(Date.now() / 1000) + 60 * 20
+
+    const spender =
+      coin.dexKind === 'uniV2'
+        ? UNISWAP_V2_ROUTER_PROXY
+        : coin.dexKind === 'uniV3'
+          ? UNISWAP_V3_ROUTER
+          : undefined
+
+    if (isNull(spender)) {
+      throw new Error('Invalid dex kind')
+    }
 
     const approveContractCall = {
       address: coin.contractAddress,
@@ -552,12 +588,17 @@ export class MemecoinSDK {
         }
       ],
       functionName: 'approve',
-      args: [UNISWAP_V2_ROUTER_PROXY, tokenAmount]
+      args: [spender, tokenAmount]
     } as const
 
     const fee = (amountOut * 17n) / 1000n // 1.7% fee
 
-    const swapContractCall = {
+    const account = walletClient.account
+    if (isNull(account)) {
+      throw new Error('No account found')
+    }
+
+    const uniswapV2SwapContractCall = {
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       abi: SWAP_EXACT_TOKENS_FOR_ETH_ABI as Abi,
       address: UNISWAP_V2_ROUTER_PROXY,
@@ -572,9 +613,35 @@ export class MemecoinSDK {
       value: fee
     } as const
 
-    const account = walletClient.account
-    if (isNull(account)) {
-      throw new Error('No account found')
+    const uniswapV3SwapContractCall = {
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+      abi: UNISWAP_V3_SWAP_ABI as Abi,
+      address: UNISWAP_V3_ROUTER,
+      functionName: 'exactInputSingle',
+      args: [
+        {
+          tokenIn: token.address,
+          tokenOut: WETH_TOKEN,
+          fee: 10000,
+          recipient: account.address,
+          deadline,
+          amountIn: tokenAmount,
+          amountOutMinimum: amountOutMin,
+          sqrtPriceLimitX96: 0
+        }
+      ],
+      value: fee
+    } as const
+
+    const swapContractCall =
+      coin.dexKind === 'uniV2'
+        ? uniswapV2SwapContractCall
+        : coin.dexKind === 'uniV3'
+          ? uniswapV3SwapContractCall
+          : undefined
+
+    if (isNull(swapContractCall)) {
+      throw new Error('Invalid dex kind')
     }
 
     if (await this.isBatchSupported()) {
@@ -640,7 +707,7 @@ export class MemecoinSDK {
       const data = encodeFunctionData(swapContractCall)
 
       const txParams = {
-        to: UNISWAP_V2_ROUTER_PROXY,
+        to: spender,
         data,
         value: fee,
         account,

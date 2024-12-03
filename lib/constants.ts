@@ -27,6 +27,10 @@ export const UNISWAP_V3_LAUNCHER = EthAddressSchema.parse(
   '0x40ad6e2979bB5E9ACaE606596969848f2c266290'
 )
 
+export const UNISWAP_V3_ROUTER = EthAddressSchema.parse(
+  '0x2626664c2603336E57B271c5C0b26F421741e481'
+) // BASE MAINNET UNISWAP V3 ROUTER
+
 export interface MemeContracts {
   DEPLOYER: EthAddress
   POOL: EthAddress
