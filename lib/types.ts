@@ -84,6 +84,7 @@ export const OnchainDataSchema = z.object({
   twitter: z.string().optional(),
   telegram: z.string().optional(),
   discord: z.string().optional(),
+  farcaster: z.string().optional(),
   description: z.string().optional(),
   farcasterId: z.number().optional()
 })
@@ -308,7 +309,6 @@ export const LaunchResultSchema = z.tuple([EthAddressSchema, z.bigint(), z.bigin
 
 export type MarketCapToTickParams = {
   marketCap: number
-  totalSupply: number
-  blockNumber: bigint
+  totalSupply: bigint
   fee: 10000 | 3000 | 500 | 100
 }

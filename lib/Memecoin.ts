@@ -1188,14 +1188,15 @@ export class MemecoinSDK {
   }
 
   async calculateDirectLaunchTick(params: MarketCapToTickParams): Promise<number> {
-    const { marketCap, totalSupply, blockNumber, fee } = params
+    const { marketCap, totalSupply, fee } = params
 
     const [tickSpacing, { price: ethPrice }] = await Promise.all([
       getUniswapV3TickSpacing(fee, this.publicClient),
-      fetchEthereumPrice(blockNumber, this.publicClient)
+      fetchEthereumPrice(this.publicClient)
     ])
 
-    const price = new BigNumber(marketCap).dividedBy(totalSupply).dividedBy(ethPrice)
+    const totalSupplyNumber = new BigNumber(totalSupply.toString())
+    const price = new BigNumber(marketCap).dividedBy(totalSupplyNumber).dividedBy(ethPrice)
 
     const tick = Math.log(price.toNumber()) / LN_1_0001
 
@@ -1222,6 +1223,10 @@ export class MemecoinSDK {
   }
 
   async estimateLaunchBuy(params: EstimateLaunchBuyParams): Promise<bigint> {
+    if (params.kind !== 'direct') {
+      throw new Error('Only direct launch is currentlysupported')
+    }
+
     const { name, ticker, antiSnipeAmount, account, tick, fee, salt, ...onchainData } = params
 
     const tokenData = encodeOnchainData(onchainData)

@@ -64,7 +64,6 @@ export async function getUniswapPair(coin: EthAddress, publicClient?: PublicClie
 }
 
 export async function fetchEthereumPrice(
-  blockNumber: bigint | undefined,
   basePublicClient: PublicClient
 ): Promise<{ price: BigNumber; updatedAt: Date }> {
   try {
@@ -72,8 +71,7 @@ export async function fetchEthereumPrice(
       basePublicClient.readContract({
         address: WETH_USDC_POOL_ADDRESS,
         abi: UNISWAP_V3_POOL_ABI,
-        functionName: 'slot0',
-        blockNumber
+        functionName: 'slot0'
       })
     )
 
