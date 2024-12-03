@@ -1,20 +1,25 @@
 import {
   SWAP_EXACT_ETH_FOR_TOKENS_ABI,
   SWAP_EXACT_TOKENS_FOR_ETH_ABI,
-  SWAP_MEMECOIN_ABI
+  SWAP_MEMECOIN_ABI,
+  UNISWAP_V3_SWAP_ABI,
+  UNISWAPV3_GENERATE_SALT_ABI,
+  UNISWAPV3_LAUNCH_ABI
 } from '@/abi'
 import {
   API_BASE_URL,
   CURRENT_MEME_INFO,
-  getBuyManyTokensABI,
   getBuyTokensABI,
   getCreateMemeABI,
   getSellTokensABI,
   INITIAL_RESERVE,
   INITIAL_SUPPLY,
+  LN_1_0001,
   MEME_V3,
   UNISWAP_V2_ROUTER,
   UNISWAP_V2_ROUTER_PROXY,
+  UNISWAP_V3_LAUNCHER,
+  UNISWAP_V3_ROUTER,
   WETH_TOKEN
 } from '@/constants'
 import {
@@ -22,17 +27,19 @@ import {
   isBatchSupported,
   isNull,
   isRequiredNumber,
-  isRequiredString,
-  isValidBigIntString
+  isValidBigIntString,
+  retry
 } from '@/functions'
 import {
   BuyFrontendParams,
-  BuyManyParams,
+  EstimateLaunchBuyParams,
   EstimateSwapCoinParams,
   EstimateSwapParams,
   EstimateTradeParams,
   EthAddress,
   EthAddressSchema,
+  GenerateSaltParams,
+  GenerateSaltResultSchema,
   HexString,
   HydratedCoin,
   HydratedCoinSchema,
@@ -42,6 +49,8 @@ import {
   isSwapFrontendParams,
   LaunchCoinParams,
   LaunchCoinResponse,
+  LaunchResultSchema,
+  MarketCapToTickParams,
   MemecoinSDKConfig,
   SellFrontendParams,
   SwapFrontendParams,
@@ -49,9 +58,8 @@ import {
   TradeSellParams,
   TradeSwapParams
 } from '@/types'
-import { getUniswapPair } from '@/uniswap'
-import { ChainId, CurrencyAmount, Percent, Token, WETH9 } from '@uniswap/sdk-core'
-import { Pair, Route, Trade } from '@uniswap/v2-sdk'
+import { fetchEthereumPrice, getUniswapPair, getUniswapV3TickSpacing } from '@/uniswap'
+import { ChainId, Token, WETH9 } from '@uniswap/sdk-core'
 import BigNumber from 'bignumber.js'
 import {
   Abi,
@@ -61,6 +69,7 @@ import {
   encodeFunctionData,
   erc20Abi,
   http,
+  Log,
   PublicClient,
   WalletCapabilities,
   WalletCapabilitiesRecord,
@@ -71,8 +80,6 @@ import { base } from 'viem/chains'
 import { eip5792Actions, getCapabilities, writeContracts } from 'viem/experimental'
 
 const FEE_COLLECTOR = CURRENT_MEME_INFO.FEE_COLLECTOR
-
-const slippageTolerance = new Percent('500', '10000')
 
 export class MemecoinSDK {
   private readonly config: MemecoinSDKConfig
@@ -250,14 +257,15 @@ export class MemecoinSDK {
           using: params.using
         })
       ])
-      let pair: Pair | undefined
       if (coin.dexInitiated) {
-        pair = await getUniswapPair(coin.contractAddress, this.publicClient)
         return this.buyFromUniswap({
           ...params,
           coin,
           amountOut,
-          pair
+          pair:
+            coin.dexKind === 'univ2'
+              ? await getUniswapPair(coin.contractAddress, this.publicClient)
+              : undefined
         })
       } else {
         return this.buyFromMemecoin({ ...params, coin, amountOut })
@@ -278,7 +286,7 @@ export class MemecoinSDK {
   }
 
   private async buyFromUniswap(params: BuyFrontendParams): Promise<HexString> {
-    const { coin, amountIn: ethAmount, slippage, pair } = params
+    const { coin, amountIn: ethAmount, slippage, pair, amountOut } = params
 
     const walletClient = this.walletClient
     const token = new Token(ChainId.BASE, coin.contractAddress, 18)
@@ -287,38 +295,58 @@ export class MemecoinSDK {
       throw new Error('WETH9 is not supported on this chain')
     }
 
-    if (isNull(pair)) {
-      throw new Error('Pair is required for uniswap trade')
-    }
-
-    const route = new Route([pair], weth, token)
-    const amountIn = CurrencyAmount.fromRawAmount(weth, ethAmount.toString())
-    const trade = Trade.exactIn(route, amountIn)
-
-    const slippageTolerancePercent = slippage
-      ? new Percent(slippage.toString(), '100')
-      : slippageTolerance
-
-    const amountOutMin = trade.minimumAmountOut(slippageTolerancePercent).quotient.toString()
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 20
-
-    const fee = (ethAmount * 17n) / 1000n // 1.7% fee
-
     const account = walletClient.account
     if (isNull(account)) {
       throw new Error('No account found')
     }
 
-    const contractParams = {
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 20
+
+    if (isNull(pair) && coin.dexKind === 'univ2') {
+      throw new Error('Pair is required for uniswap trade')
+    }
+
+    const amountOutMin = this.calculateMinAmountWithSlippage(amountOut, slippage)
+
+    const fee = (ethAmount * 17n) / 1000n // 1.7% fee
+
+    const uniswapV2SwapContractCall = {
       abi: SWAP_EXACT_ETH_FOR_TOKENS_ABI,
       functionName: 'swapExactETHForTokens',
       args: [token.address, amountOutMin, deadline, fee]
     }
 
+    const uniswapV3SwapContractCall = {
+      abi: UNISWAP_V3_SWAP_ABI,
+      functionName: 'exactInputSingle',
+      args: [
+        {
+          tokenIn: WETH_TOKEN,
+          tokenOut: token.address,
+          fee: 10000,
+          recipient: account.address,
+          amountIn: ethAmount,
+          amountOutMinimum: amountOutMin,
+          sqrtPriceLimitX96: 0n
+        }
+      ]
+    }
+
+    const contractParams = (() => {
+      switch (coin.dexKind) {
+        case 'univ2':
+          return uniswapV2SwapContractCall
+        case 'univ3':
+          return uniswapV3SwapContractCall
+      }
+    })()
+
+    const spender = this.getUniswapContract(coin)
+
     const data = encodeFunctionData(contractParams)
 
     const txParams = {
-      to: UNISWAP_V2_ROUTER_PROXY,
+      to: spender,
       data,
       value: ethAmount,
       account,
@@ -352,6 +380,10 @@ export class MemecoinSDK {
       throw new Error('No account found')
     }
 
+    if (isNull(coin.memePool)) {
+      throw new Error('Meme pool is required for memecoin trade')
+    }
+
     const abi = getBuyTokensABI(coin.memePool)
 
     const args = [
@@ -371,82 +403,6 @@ export class MemecoinSDK {
       to: coin.memePool,
       data,
       value: amountIn,
-      account,
-      chain: base
-    }
-
-    const tx = (await this.isBatchSupported())
-      ? await walletClient.sendTransaction(txParams)
-      : await walletClient.sendTransaction({
-          ...txParams,
-          gas: ((await this.publicClient.estimateGas(txParams)) * 125n) / 100n
-        })
-
-    const receipt = await this.publicClient.waitForTransactionReceipt({
-      hash: tx,
-      confirmations: 3
-    })
-
-    return receipt.transactionHash
-  }
-
-  async buyManyMemecoins(params: BuyManyParams): Promise<HexString> {
-    const isBatchSupported = await this.isBatchSupported()
-    if (!isBatchSupported) {
-      await this.switchToBaseChain()
-    }
-
-    const walletClient = this.walletClient
-
-    const { memeCoins, ethAmounts, expectedTokensAmounts, affiliate, lockingDays } = params
-
-    const minTokensAmounts = expectedTokensAmounts.map((amount) =>
-      this.calculateMinAmountWithSlippage(amount)
-    )
-
-    const account = walletClient.account
-    if (isNull(account)) {
-      throw new Error('No account found')
-    }
-
-    // Which memepool to use
-    if (isNull(memeCoins[0])) {
-      throw new Error('No token addresses provided')
-    }
-
-    let memePool: EthAddress
-    const firstCoin = memeCoins[0]
-
-    if (isNull(firstCoin)) {
-      throw new Error('No token addresses provided')
-    }
-
-    if (isRequiredString(firstCoin)) {
-      memePool = (await this.getCoin(firstCoin)).memePool
-    } else {
-      memePool = firstCoin.memePool
-    }
-
-    const abi = getBuyManyTokensABI(memePool)
-
-    const args = [
-      memeCoins.map((coin) => (isRequiredString(coin) ? coin : coin.contractAddress)),
-      minTokensAmounts,
-      ethAmounts,
-      affiliate ?? FEE_COLLECTOR,
-      BigInt(lockingDays ?? 0)
-    ]
-
-    const data = encodeFunctionData({
-      abi,
-      functionName: 'buyManyTokens',
-      args
-    })
-
-    const txParams = {
-      to: memePool,
-      data,
-      value: ethAmounts.reduce((acc, curr) => acc + curr, BigInt(0)),
       account,
       chain: base
     }
@@ -553,19 +509,28 @@ export class MemecoinSDK {
         throw new Error('No account found')
       }
 
-      const allowance = await this.getERC20Allowance(coin.contractAddress, coin.memePool, address)
-
-      let pair: Pair | undefined
       if (coin.dexInitiated) {
-        pair = await getUniswapPair(coin.contractAddress, this.publicClient)
+        const spender = this.getUniswapContract(coin)
+
+        const allowance = await this.getERC20Allowance(coin.contractAddress, spender, address)
+
         return this.sellFromUniswap({
           ...params,
           coin,
           amountOut,
-          pair,
+          pair:
+            coin.dexKind === 'univ2'
+              ? await getUniswapPair(coin.contractAddress, this.publicClient)
+              : undefined,
           allowance
         })
       } else {
+        if (isNull(coin.memePool)) {
+          throw new Error('Meme pool is required for memecoin trade')
+        }
+
+        const allowance = await this.getERC20Allowance(coin.contractAddress, coin.memePool, address)
+
         return this.sellFromMemecoin({ ...params, coin, amountOut, allowance })
       }
     }
@@ -582,19 +547,14 @@ export class MemecoinSDK {
       throw new Error('WETH9 is not supported on this chain')
     }
 
-    if (isNull(pair)) {
+    if (isNull(pair) && coin.dexKind === 'univ2') {
       throw new Error('Pair is required for uniswap trade')
     }
 
-    const route = new Route([pair], token, weth)
-    const amountIn = CurrencyAmount.fromRawAmount(token, tokenAmount.toString())
-    const trade = Trade.exactIn(route, amountIn)
-
-    const slippageTolerancePercent = slippage
-      ? new Percent(slippage.toString(), '100')
-      : slippageTolerance
-    const amountOutMin = trade.minimumAmountOut(slippageTolerancePercent).quotient.toString()
+    const amountOutMin = this.calculateMinAmountWithSlippage(amountOut, slippage)
     const deadline = Math.floor(Date.now() / 1000) + 60 * 20
+
+    const spender = this.getUniswapContract(coin)
 
     const approveContractCall = {
       address: coin.contractAddress,
@@ -611,12 +571,17 @@ export class MemecoinSDK {
         }
       ],
       functionName: 'approve',
-      args: [UNISWAP_V2_ROUTER_PROXY, tokenAmount]
+      args: [spender, tokenAmount]
     } as const
 
     const fee = (amountOut * 17n) / 1000n // 1.7% fee
 
-    const swapContractCall = {
+    const account = walletClient.account
+    if (isNull(account)) {
+      throw new Error('No account found')
+    }
+
+    const uniswapV2SwapContractCall = {
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       abi: SWAP_EXACT_TOKENS_FOR_ETH_ABI as Abi,
       address: UNISWAP_V2_ROUTER_PROXY,
@@ -631,10 +596,34 @@ export class MemecoinSDK {
       value: fee
     } as const
 
-    const account = walletClient.account
-    if (isNull(account)) {
-      throw new Error('No account found')
-    }
+    const uniswapV3SwapContractCall = {
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+      abi: UNISWAP_V3_SWAP_ABI as Abi,
+      address: UNISWAP_V3_ROUTER,
+      functionName: 'exactInputSingle',
+      args: [
+        {
+          tokenIn: token.address,
+          tokenOut: WETH_TOKEN,
+          fee: 10000,
+          recipient: account.address,
+          deadline,
+          amountIn: tokenAmount,
+          amountOutMinimum: amountOutMin,
+          sqrtPriceLimitX96: 0
+        }
+      ],
+      value: fee
+    } as const
+
+    const swapContractCall = (() => {
+      switch (coin.dexKind) {
+        case 'univ2':
+          return uniswapV2SwapContractCall
+        case 'univ3':
+          return uniswapV3SwapContractCall
+      }
+    })()
 
     if (await this.isBatchSupported()) {
       const result = await writeContracts(walletClient, {
@@ -684,7 +673,6 @@ export class MemecoinSDK {
         }
 
         const gas = ((await this.publicClient.estimateGas(txParams)) * 125n) / 100n
-
         const approveTx = await walletClient.sendTransaction({
           ...txParams,
           gas
@@ -699,7 +687,7 @@ export class MemecoinSDK {
       const data = encodeFunctionData(swapContractCall)
 
       const txParams = {
-        to: UNISWAP_V2_ROUTER_PROXY,
+        to: spender,
         data,
         value: fee,
         account,
@@ -712,7 +700,6 @@ export class MemecoinSDK {
         ...txParams,
         gas
       })
-
       const receipt = await this.publicClient.waitForTransactionReceipt({
         hash: tx,
         confirmations: 3
@@ -729,15 +716,20 @@ export class MemecoinSDK {
 
     const minETHAmount = this.calculateMinAmountWithSlippage(amountOut, slippage)
 
+    const memePool = coin.memePool
+    if (isNull(memePool)) {
+      throw new Error('Meme pool is required for memecoin trade')
+    }
+
     const approveContractCall = {
       address: coin.contractAddress,
       abi: erc20Abi,
       functionName: 'approve',
-      args: [coin.memePool, amountIn]
+      args: [memePool, amountIn]
     } as const
 
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    const abi = getSellTokensABI(coin.memePool) as Abi
+    const abi = getSellTokensABI(memePool) as Abi
 
     const account = walletClient.account
     if (isNull(account)) {
@@ -749,7 +741,7 @@ export class MemecoinSDK {
     }
 
     const sellContractCall = {
-      address: coin.memePool,
+      address: memePool,
       abi,
       functionName: 'sellTokens',
       args: [coin.contractAddress, amountIn, minETHAmount, affiliate ?? FEE_COLLECTOR]
@@ -1066,12 +1058,12 @@ export class MemecoinSDK {
       telegram,
       discord,
       lockingDays,
-      farcasterId
+      farcasterId,
+      kind
     } = params
 
-    const memeDeployer = CURRENT_MEME_INFO.DEPLOYER
-
-    const abi = getCreateMemeABI(memeDeployer)
+    let contractAddress: EthAddress
+    let txHash: HexString
 
     const tokenData = encodeOnchainData({
       image,
@@ -1088,58 +1080,81 @@ export class MemecoinSDK {
       throw new Error('No account found')
     }
 
-    const data = encodeFunctionData({
-      abi,
-      functionName: 'CreateMeme',
-      args: [
-        name,
-        ticker,
-        tokenData,
-        INITIAL_SUPPLY,
-        INITIAL_RESERVE,
-        WETH_TOKEN.toString(),
-        UNISWAP_V2_ROUTER,
-        antiSnipeAmount > BigInt(0),
-        antiSnipeAmount,
-        BigInt(lockingDays ?? 0)
-      ]
-    })
+    switch (kind) {
+      case 'bonding-curve': {
+        const memeDeployer = CURRENT_MEME_INFO.DEPLOYER
 
-    const txParams = {
-      to: memeDeployer,
-      data,
-      account,
-      chain: base,
-      value: INITIAL_RESERVE + teamFee + antiSnipeAmount
-    }
+        const abi = getCreateMemeABI(memeDeployer)
 
-    const tx = await walletClient.sendTransaction(txParams)
+        const data = encodeFunctionData({
+          abi,
+          functionName: 'CreateMeme',
+          args: [
+            name,
+            ticker,
+            tokenData,
+            INITIAL_SUPPLY,
+            INITIAL_RESERVE,
+            WETH_TOKEN.toString(),
+            UNISWAP_V2_ROUTER,
+            antiSnipeAmount > BigInt(0),
+            antiSnipeAmount,
+            BigInt(lockingDays ?? 0)
+          ]
+        })
 
-    const receipt = await this.publicClient.waitForTransactionReceipt({
-      hash: tx,
-      confirmations: 3
-    })
+        const txParams = {
+          to: memeDeployer,
+          data,
+          account,
+          chain: base,
+          value: INITIAL_RESERVE + teamFee + antiSnipeAmount
+        }
 
-    const log = receipt.logs.find((log) => log.address.toLowerCase() === memeDeployer.toLowerCase())
-    const topic2 = log?.topics[2]
+        txHash = await walletClient.sendTransaction(txParams)
 
-    if (isNull(log)) {
-      throw new Error('Failed to find logs for create coin')
-    }
+        const receipt = await this.publicClient.waitForTransactionReceipt({
+          hash: txHash,
+          confirmations: 3
+        })
 
-    if (isNull(topic2)) {
-      throw Error('Failed to find topic 2')
-    }
+        contractAddress = this.getContractAddressFromLogs(receipt.logs, memeDeployer, 2)
 
-    const contractAddress = EthAddressSchema.parse(`0x${topic2.slice(26)}`)
+        break
+      }
+      case 'direct': {
+        const { tick, fee, salt } = params
 
-    if (isNull(contractAddress)) {
-      throw new Error('Failed to create coin')
+        const data = encodeFunctionData({
+          abi: UNISWAPV3_LAUNCH_ABI,
+          functionName: 'launch',
+          args: [name, ticker, INITIAL_SUPPLY, tick, fee, salt, account.address, tokenData]
+        })
+
+        const txParams = {
+          to: UNISWAP_V3_LAUNCHER,
+          data,
+          account,
+          chain: base,
+          value: antiSnipeAmount
+        }
+
+        txHash = await walletClient.sendTransaction(txParams)
+
+        const receipt = await this.publicClient.waitForTransactionReceipt({
+          hash: txHash,
+          confirmations: 3
+        })
+
+        contractAddress = this.getContractAddressFromLogs(receipt.logs, UNISWAP_V3_LAUNCHER, 1)
+
+        break
+      }
     }
 
     return {
       contractAddress,
-      txHash: tx
+      txHash
     }
   }
 
@@ -1170,5 +1185,99 @@ export class MemecoinSDK {
     }
 
     return BigInt(result)
+  }
+
+  async calculateDirectLaunchTick(params: MarketCapToTickParams): Promise<number> {
+    const { marketCap, totalSupply, blockNumber, fee } = params
+
+    const [tickSpacing, { price: ethPrice }] = await Promise.all([
+      getUniswapV3TickSpacing(fee, this.publicClient),
+      fetchEthereumPrice(blockNumber, this.publicClient)
+    ])
+
+    const price = new BigNumber(marketCap).dividedBy(totalSupply).dividedBy(ethPrice)
+
+    const tick = Math.log(price.toNumber()) / LN_1_0001
+
+    const roundedTick = Math.round(tick / tickSpacing) * tickSpacing
+
+    return roundedTick
+  }
+
+  async generateDirectLaunchSalt(params: GenerateSaltParams): Promise<HexString> {
+    const { account, name, symbol, supply, ...onchainData } = params
+
+    const tokenData = encodeOnchainData(onchainData)
+
+    const result = await retry(() =>
+      this.publicClient.readContract({
+        address: UNISWAP_V3_LAUNCHER,
+        abi: UNISWAPV3_GENERATE_SALT_ABI,
+        functionName: 'generateSalt',
+        args: [account, name, symbol, supply, tokenData]
+      })
+    )
+
+    return GenerateSaltResultSchema.parse(result).salt
+  }
+
+  async estimateLaunchBuy(params: EstimateLaunchBuyParams): Promise<bigint> {
+    const { name, ticker, antiSnipeAmount, account, tick, fee, salt, ...onchainData } = params
+
+    const tokenData = encodeOnchainData(onchainData)
+
+    const launchArgs = {
+      _name: name,
+      _symbol: ticker,
+      _supply: INITIAL_SUPPLY,
+      _initialTick: tick,
+      _fee: fee,
+      _salt: salt,
+      _deployer: account,
+      _data: tokenData
+    }
+
+    const launchTx = {
+      address: UNISWAP_V3_LAUNCHER,
+      abi: UNISWAPV3_LAUNCH_ABI,
+      functionName: 'launch',
+      args: Object.values(launchArgs),
+      value: antiSnipeAmount,
+      account
+    }
+
+    const { result } = await this.publicClient.simulateContract(launchTx)
+
+    const [, , amountSwapped] = LaunchResultSchema.parse(result)
+
+    return amountSwapped
+  }
+
+  private getContractAddressFromLogs(
+    logs: Log[],
+    contractAddress: EthAddress,
+    topicIndex: number
+  ): EthAddress {
+    const log = logs.find((log) => log.address.toLowerCase() === contractAddress.toLowerCase())
+    const topic = log?.topics[topicIndex]
+
+    if (isNull(log)) {
+      throw new Error('Failed to find logs for create coin')
+    }
+
+    if (isNull(topic)) {
+      throw Error('Failed to find topic')
+    }
+
+    return EthAddressSchema.parse(`0x${topic.slice(26)}`)
+  }
+
+  private getUniswapContract(coin: HydratedCoin): EthAddress {
+    switch (coin.dexKind) {
+      case 'univ2':
+        return UNISWAP_V2_ROUTER_PROXY
+      case 'univ3':
+        return UNISWAP_V3_ROUTER
+    }
   }
 }

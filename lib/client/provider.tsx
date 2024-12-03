@@ -3,14 +3,16 @@
 import { MemecoinSDK } from '@/Memecoin'
 import {
   BuyFrontendParams,
-  BuyManyParams,
+  EstimateLaunchBuyParams,
   EstimateSwapParams,
   EstimateTradeParams,
   EthAddress,
+  GenerateSaltParams,
   HexString,
   HydratedCoin,
   LaunchCoinParams,
   LaunchCoinResponse,
+  MarketCapToTickParams,
   SellFrontendParams,
   SwapFrontendParams
 } from '@/types'
@@ -28,7 +30,6 @@ interface MemecoinContextType {
   sell: (params: SellFrontendParams) => Promise<HexString>
   estimateSell: (params: EstimateTradeParams) => Promise<bigint>
   swap: (params: SwapFrontendParams) => Promise<HexString>
-  buyMany: (params: BuyManyParams) => Promise<HexString>
   launchCoin: (params: LaunchCoinParams) => Promise<LaunchCoinResponse>
   getPair: (coin: EthAddress) => Promise<Pair>
   getERC20Allowance: (
@@ -36,6 +37,9 @@ interface MemecoinContextType {
     spenderAddress: EthAddress,
     accountAddress: EthAddress
   ) => Promise<bigint>
+  generateDirectLaunchSalt: (params: GenerateSaltParams) => Promise<HexString>
+  estimateLaunchBuy: (params: EstimateLaunchBuyParams) => Promise<bigint>
+  calculateDirectLaunchTick: (params: MarketCapToTickParams) => Promise<number>
 }
 
 interface MemecoinProviderProps {
@@ -79,7 +83,9 @@ export const MemecoinProvider = ({
     launchCoin: sdk.launch.bind(sdk),
     getPair: (coin: EthAddress) => getUniswapPair(coin, sdk.publicClient),
     getERC20Allowance: sdk.getERC20Allowance.bind(sdk),
-    buyMany: sdk.buyManyMemecoins.bind(sdk)
+    generateDirectLaunchSalt: sdk.generateDirectLaunchSalt.bind(sdk),
+    estimateLaunchBuy: sdk.estimateLaunchBuy.bind(sdk),
+    calculateDirectLaunchTick: sdk.calculateDirectLaunchTick.bind(sdk)
   }
 
   return <MemecoinContext.Provider value={contextValue}>{children}</MemecoinContext.Provider>

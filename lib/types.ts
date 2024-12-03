@@ -34,7 +34,7 @@ export type MemecoinSDKConfig =
       privateKey?: HexString
     })
 
-export interface LaunchCoinParams {
+export interface BaseLaunchCoinParams {
   name: string
   ticker: string
   antiSnipeAmount: bigint
@@ -47,6 +47,21 @@ export interface LaunchCoinParams {
   lockingDays?: number
   farcasterId?: number
 }
+
+export type LaunchCoinBondingCurveParams = BaseLaunchCoinParams & {
+  kind: 'bonding-curve'
+}
+
+export type LaunchCoinDirectParams = BaseLaunchCoinParams & {
+  kind: 'direct'
+  tick: number
+  salt: HexString
+  fee: number
+}
+
+export type EstimateLaunchBuyParams = LaunchCoinDirectParams & { account: EthAddress }
+
+export type LaunchCoinParams = LaunchCoinBondingCurveParams | LaunchCoinDirectParams
 
 export interface LaunchCoinResponse {
   contractAddress: EthAddress
@@ -85,16 +100,18 @@ export const CoinSchema = z.object({
     .transform((arg) => BigInt(arg))
     .nullable(),
   creator: EthAddressSchema,
-  memeDeployer: EthAddressSchema,
-  memePool: EthAddressSchema,
-  memeEventTracker: EthAddressSchema,
-  rewardsPool: EthAddressSchema,
-  memeStorage: EthAddressSchema,
+  memeDeployer: EthAddressSchema.nullable(),
+  memePool: EthAddressSchema.nullable(),
+  memeEventTracker: EthAddressSchema.nullable(),
+  rewardsPool: EthAddressSchema.nullable(),
+  memeStorage: EthAddressSchema.nullable(),
   totalSupply: z.string().transform((arg) => BigInt(arg)),
   marketCap: z.string().transform((value) => BigInt(value)),
   name: z.string(),
   ticker: z.string(),
-  description: z.string()
+  description: z.string(),
+  dexKind: z.enum(['univ2', 'univ3']),
+  dexMetadata: z.string().nullable()
 })
 
 export type Coin = z.infer<typeof CoinSchema>
@@ -273,4 +290,25 @@ export function isSwapFrontendParams(params: TradeSwapParams): params is SwapFro
     isHydratedCoinOrEth(params.fromToken) &&
     isHydratedCoinOrEth(params.toToken)
   )
+}
+
+export const GenerateSaltResultSchema = z.object({
+  salt: HexStringSchema,
+  token: EthAddressSchema
+})
+
+export type GenerateSaltParams = {
+  name: string
+  symbol: string
+  supply: bigint
+  account: EthAddress
+} & OnchainData
+
+export const LaunchResultSchema = z.tuple([EthAddressSchema, z.bigint(), z.bigint()])
+
+export type MarketCapToTickParams = {
+  marketCap: number
+  totalSupply: number
+  blockNumber: bigint
+  fee: 10000 | 3000 | 500 | 100
 }
