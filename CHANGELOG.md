@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.14
+
+### Patch Changes
+
+- d2e8eac: fix parameter types
+
 ## 0.0.13
 
 ### Patch Changes
