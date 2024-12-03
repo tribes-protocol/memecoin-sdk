@@ -8,7 +8,6 @@ import {
 import {
   API_BASE_URL,
   CURRENT_MEME_INFO,
-  getBuyManyTokensABI,
   getBuyTokensABI,
   getCreateMemeABI,
   getSellTokensABI,
@@ -26,13 +25,11 @@ import {
   isBatchSupported,
   isNull,
   isRequiredNumber,
-  isRequiredString,
   isValidBigIntString,
   retry
 } from '@/functions'
 import {
   BuyFrontendParams,
-  BuyManyParams,
   EstimateSwapCoinParams,
   EstimateSwapParams,
   EstimateTradeParams,
@@ -359,6 +356,10 @@ export class MemecoinSDK {
       throw new Error('No account found')
     }
 
+    if (isNull(coin.memePool)) {
+      throw new Error('Meme pool is required for memecoin trade')
+    }
+
     const abi = getBuyTokensABI(coin.memePool)
 
     const args = [
@@ -378,82 +379,6 @@ export class MemecoinSDK {
       to: coin.memePool,
       data,
       value: amountIn,
-      account,
-      chain: base
-    }
-
-    const tx = (await this.isBatchSupported())
-      ? await walletClient.sendTransaction(txParams)
-      : await walletClient.sendTransaction({
-          ...txParams,
-          gas: ((await this.publicClient.estimateGas(txParams)) * 125n) / 100n
-        })
-
-    const receipt = await this.publicClient.waitForTransactionReceipt({
-      hash: tx,
-      confirmations: 3
-    })
-
-    return receipt.transactionHash
-  }
-
-  async buyManyMemecoins(params: BuyManyParams): Promise<HexString> {
-    const isBatchSupported = await this.isBatchSupported()
-    if (!isBatchSupported) {
-      await this.switchToBaseChain()
-    }
-
-    const walletClient = this.walletClient
-
-    const { memeCoins, ethAmounts, expectedTokensAmounts, affiliate, lockingDays } = params
-
-    const minTokensAmounts = expectedTokensAmounts.map((amount) =>
-      this.calculateMinAmountWithSlippage(amount)
-    )
-
-    const account = walletClient.account
-    if (isNull(account)) {
-      throw new Error('No account found')
-    }
-
-    // Which memepool to use
-    if (isNull(memeCoins[0])) {
-      throw new Error('No token addresses provided')
-    }
-
-    let memePool: EthAddress
-    const firstCoin = memeCoins[0]
-
-    if (isNull(firstCoin)) {
-      throw new Error('No token addresses provided')
-    }
-
-    if (isRequiredString(firstCoin)) {
-      memePool = (await this.getCoin(firstCoin)).memePool
-    } else {
-      memePool = firstCoin.memePool
-    }
-
-    const abi = getBuyManyTokensABI(memePool)
-
-    const args = [
-      memeCoins.map((coin) => (isRequiredString(coin) ? coin : coin.contractAddress)),
-      minTokensAmounts,
-      ethAmounts,
-      affiliate ?? FEE_COLLECTOR,
-      BigInt(lockingDays ?? 0)
-    ]
-
-    const data = encodeFunctionData({
-      abi,
-      functionName: 'buyManyTokens',
-      args
-    })
-
-    const txParams = {
-      to: memePool,
-      data,
-      value: ethAmounts.reduce((acc, curr) => acc + curr, BigInt(0)),
       account,
       chain: base
     }
@@ -560,11 +485,14 @@ export class MemecoinSDK {
         throw new Error('No account found')
       }
 
-      const allowance = await this.getERC20Allowance(coin.contractAddress, coin.memePool, address)
-
       let pair: Pair | undefined
       if (coin.dexInitiated) {
         pair = await getUniswapPair(coin.contractAddress, this.publicClient)
+        const allowance = await this.getERC20Allowance(
+          coin.contractAddress,
+          UNISWAP_V2_ROUTER_PROXY,
+          address
+        )
         return this.sellFromUniswap({
           ...params,
           coin,
@@ -573,6 +501,12 @@ export class MemecoinSDK {
           allowance
         })
       } else {
+        if (isNull(coin.memePool)) {
+          throw new Error('Meme pool is required for memecoin trade')
+        }
+
+        const allowance = await this.getERC20Allowance(coin.contractAddress, coin.memePool, address)
+
         return this.sellFromMemecoin({ ...params, coin, amountOut, allowance })
       }
     }
@@ -736,15 +670,20 @@ export class MemecoinSDK {
 
     const minETHAmount = this.calculateMinAmountWithSlippage(amountOut, slippage)
 
+    const memePool = coin.memePool
+    if (isNull(memePool)) {
+      throw new Error('Meme pool is required for memecoin trade')
+    }
+
     const approveContractCall = {
       address: coin.contractAddress,
       abi: erc20Abi,
       functionName: 'approve',
-      args: [coin.memePool, amountIn]
+      args: [memePool, amountIn]
     } as const
 
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    const abi = getSellTokensABI(coin.memePool) as Abi
+    const abi = getSellTokensABI(memePool) as Abi
 
     const account = walletClient.account
     if (isNull(account)) {
@@ -756,7 +695,7 @@ export class MemecoinSDK {
     }
 
     const sellContractCall = {
-      address: coin.memePool,
+      address: memePool,
       abi,
       functionName: 'sellTokens',
       args: [coin.contractAddress, amountIn, minETHAmount, affiliate ?? FEE_COLLECTOR]

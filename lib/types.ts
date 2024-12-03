@@ -98,16 +98,18 @@ export const CoinSchema = z.object({
     .transform((arg) => BigInt(arg))
     .nullable(),
   creator: EthAddressSchema,
-  memeDeployer: EthAddressSchema,
-  memePool: EthAddressSchema,
-  memeEventTracker: EthAddressSchema,
-  rewardsPool: EthAddressSchema,
-  memeStorage: EthAddressSchema,
+  memeDeployer: EthAddressSchema.nullable(),
+  memePool: EthAddressSchema.nullable(),
+  memeEventTracker: EthAddressSchema.nullable(),
+  rewardsPool: EthAddressSchema.nullable(),
+  memeStorage: EthAddressSchema.nullable(),
   totalSupply: z.string().transform((arg) => BigInt(arg)),
   marketCap: z.string().transform((value) => BigInt(value)),
   name: z.string(),
   ticker: z.string(),
-  description: z.string()
+  description: z.string(),
+  dexKind: z.enum(['uniV2', 'uniV3']),
+  dexMetadata: z.string().nullable()
 })
 
 export type Coin = z.infer<typeof CoinSchema>
