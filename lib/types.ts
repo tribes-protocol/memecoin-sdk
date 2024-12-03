@@ -301,11 +301,7 @@ export type GenerateSaltParams = {
   supply: bigint
 } & OnchainData
 
-export const LaunchResultSchema = z.tuple([
-  EthAddressSchema,
-  z.number(),
-  z.string().transform((arg) => BigInt(arg))
-])
+export const LaunchResultSchema = z.tuple([EthAddressSchema, z.bigint(), z.bigint()])
 
 export type MarketCapToTickParams = {
   marketCap: number

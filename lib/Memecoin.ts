@@ -60,7 +60,6 @@ import {
 } from '@/types'
 import { fetchEthereumPrice, getUniswapPair, getUniswapV3TickSpacing } from '@/uniswap'
 import { ChainId, Token, WETH9 } from '@uniswap/sdk-core'
-import { Pair } from '@uniswap/v2-sdk'
 import BigNumber from 'bignumber.js'
 import {
   Abi,
@@ -258,14 +257,15 @@ export class MemecoinSDK {
           using: params.using
         })
       ])
-      let pair: Pair | undefined
       if (coin.dexInitiated) {
-        pair = await getUniswapPair(coin.contractAddress, this.publicClient)
         return this.buyFromUniswap({
           ...params,
           coin,
           amountOut,
-          pair
+          pair:
+            coin.dexKind === 'uniV2'
+              ? await getUniswapPair(coin.contractAddress, this.publicClient)
+              : undefined
         })
       } else {
         return this.buyFromMemecoin({ ...params, coin, amountOut })
@@ -343,16 +343,7 @@ export class MemecoinSDK {
       throw new Error('Invalid dex kind')
     }
 
-    const spender =
-      coin.dexKind === 'uniV2'
-        ? UNISWAP_V2_ROUTER_PROXY
-        : coin.dexKind === 'uniV3'
-          ? UNISWAP_V3_ROUTER
-          : undefined
-
-    if (isNull(spender)) {
-      throw new Error('Invalid dex kind')
-    }
+    const spender = this.getUniswapContract(coin)
 
     const data = encodeFunctionData(contractParams)
 
@@ -520,19 +511,19 @@ export class MemecoinSDK {
         throw new Error('No account found')
       }
 
-      let pair: Pair | undefined
       if (coin.dexInitiated) {
-        pair = await getUniswapPair(coin.contractAddress, this.publicClient)
-        const allowance = await this.getERC20Allowance(
-          coin.contractAddress,
-          UNISWAP_V2_ROUTER_PROXY,
-          address
-        )
+        const spender = this.getUniswapContract(coin)
+
+        const allowance = await this.getERC20Allowance(coin.contractAddress, spender, address)
+
         return this.sellFromUniswap({
           ...params,
           coin,
           amountOut,
-          pair,
+          pair:
+            coin.dexKind === 'uniV2'
+              ? await getUniswapPair(coin.contractAddress, this.publicClient)
+              : undefined,
           allowance
         })
       } else {
@@ -565,16 +556,7 @@ export class MemecoinSDK {
     const amountOutMin = this.calculateMinAmountWithSlippage(amountOut, slippage)
     const deadline = Math.floor(Date.now() / 1000) + 60 * 20
 
-    const spender =
-      coin.dexKind === 'uniV2'
-        ? UNISWAP_V2_ROUTER_PROXY
-        : coin.dexKind === 'uniV3'
-          ? UNISWAP_V3_ROUTER
-          : undefined
-
-    if (isNull(spender)) {
-      throw new Error('Invalid dex kind')
-    }
+    const spender = this.getUniswapContract(coin)
 
     const approveContractCall = {
       address: coin.contractAddress,
@@ -1302,5 +1284,14 @@ export class MemecoinSDK {
     }
 
     return EthAddressSchema.parse(`0x${topic.slice(26)}`)
+  }
+
+  private getUniswapContract(coin: HydratedCoin): EthAddress {
+    switch (coin.dexKind) {
+      case 'uniV2':
+        return UNISWAP_V2_ROUTER_PROXY
+      case 'uniV3':
+        return UNISWAP_V3_ROUTER
+    }
   }
 }
