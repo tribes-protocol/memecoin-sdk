@@ -6,10 +6,13 @@ import {
   EstimateSwapParams,
   EstimateTradeParams,
   EthAddress,
+  GenerateSaltParams,
   HexString,
   HydratedCoin,
+  LaunchCoinDirectParams,
   LaunchCoinParams,
   LaunchCoinResponse,
+  MarketCapToTickParams,
   SellFrontendParams,
   SwapFrontendParams
 } from '@/types'
@@ -34,6 +37,9 @@ interface MemecoinContextType {
     spenderAddress: EthAddress,
     accountAddress: EthAddress
   ) => Promise<bigint>
+  generateSalt: (params: GenerateSaltParams) => Promise<HexString>
+  getExpectedOutputAmount: (params: LaunchCoinDirectParams) => Promise<bigint>
+  marketCapToTick: (params: MarketCapToTickParams) => Promise<number>
 }
 
 interface MemecoinProviderProps {
@@ -76,7 +82,10 @@ export const MemecoinProvider = ({
     swap: sdk.swap.bind(sdk),
     launchCoin: sdk.launch.bind(sdk),
     getPair: (coin: EthAddress) => getUniswapPair(coin, sdk.publicClient),
-    getERC20Allowance: sdk.getERC20Allowance.bind(sdk)
+    getERC20Allowance: sdk.getERC20Allowance.bind(sdk),
+    generateSalt: sdk.generateSalt.bind(sdk),
+    getExpectedOutputAmount: sdk.getExpectedOutputAmount.bind(sdk),
+    marketCapToTick: sdk.marketCapToTick.bind(sdk)
   }
 
   return <MemecoinContext.Provider value={contextValue}>{children}</MemecoinContext.Provider>

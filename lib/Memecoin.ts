@@ -37,6 +37,7 @@ import {
   EstimateTradeParams,
   EthAddress,
   EthAddressSchema,
+  GenerateSaltParams,
   GenerateSaltResultSchema,
   HexString,
   HydratedCoin,
@@ -45,8 +46,11 @@ import {
   isEthAddressOrEth,
   isSellFrontendParams,
   isSwapFrontendParams,
+  LaunchCoinDirectParams,
   LaunchCoinParams,
   LaunchCoinResponse,
+  LaunchResultSchema,
+  MarketCapToTickParams,
   MemecoinSDKConfig,
   SellFrontendParams,
   SwapFrontendParams,
@@ -1205,12 +1209,9 @@ export class MemecoinSDK {
     return BigInt(result)
   }
 
-  async marketCapToTick(
-    marketCap: number,
-    totalSupply: number,
-    blockNumber: bigint,
-    fee: 10000 | 5000 | 3000 = 10000
-  ): Promise<number> {
+  async marketCapToTick(params: MarketCapToTickParams): Promise<number> {
+    const { marketCap, totalSupply, blockNumber, fee } = params
+
     const [tickSpacing, { price: ethPrice }] = await Promise.all([
       getUniswapV3TickSpacing(fee, this.publicClient),
       fetchEthereumPrice(blockNumber, this.publicClient)
@@ -1225,27 +1226,63 @@ export class MemecoinSDK {
     return roundedTick
   }
 
-  async generateSalt(
-    name: string,
-    symbol: string,
-    supply: bigint,
-    data: string
-  ): Promise<HexString> {
+  async generateSalt(params: GenerateSaltParams): Promise<HexString> {
     const account = this.walletClient.account
     if (isNull(account)) {
       throw new Error('No account found')
     }
+
+    const { name, symbol, supply, ...onchainData } = params
+
+    const tokenData = encodeOnchainData(onchainData)
 
     const result = await retry(() =>
       this.publicClient.readContract({
         address: UNISWAP_V3_LAUNCHER,
         abi: UNISWAPV3_GENERATE_SALT_ABI,
         functionName: 'generateSalt',
-        args: [account.address, name, symbol, supply, data]
+        args: [account.address, name, symbol, supply, tokenData]
       })
     )
 
     return GenerateSaltResultSchema.parse(result).salt
+  }
+
+  async getExpectedOutputAmount(params: LaunchCoinDirectParams): Promise<bigint> {
+    const account = this.walletClient.account
+    if (isNull(account)) {
+      throw new Error('No account found')
+    }
+
+    const { name, ticker, antiSnipeAmount, tick, fee, salt, ...onchainData } = params
+
+    const tokenData = encodeOnchainData(onchainData)
+
+    const launchArgs = {
+      _name: name,
+      _symbol: ticker,
+      _supply: INITIAL_SUPPLY,
+      _initialTick: tick,
+      _fee: fee,
+      _salt: salt,
+      _deployer: account.address,
+      _data: tokenData
+    }
+
+    const launchTx = {
+      address: UNISWAP_V3_LAUNCHER,
+      abi: UNISWAPV3_LAUNCH_ABI,
+      functionName: 'launch',
+      args: Object.values(launchArgs),
+      value: antiSnipeAmount,
+      account
+    }
+
+    const { result } = await this.publicClient.simulateContract(launchTx)
+
+    const [, , amountSwapped] = LaunchResultSchema.parse(result)
+
+    return amountSwapped
   }
 
   private getContractAddressFromLogs(

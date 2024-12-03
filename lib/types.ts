@@ -294,3 +294,22 @@ export const GenerateSaltResultSchema = z.object({
   salt: HexStringSchema,
   token: EthAddressSchema
 })
+
+export type GenerateSaltParams = {
+  name: string
+  symbol: string
+  supply: bigint
+} & OnchainData
+
+export const LaunchResultSchema = z.tuple([
+  EthAddressSchema,
+  z.number(),
+  z.string().transform((arg) => BigInt(arg))
+])
+
+export type MarketCapToTickParams = {
+  marketCap: number
+  totalSupply: number
+  blockNumber: bigint
+  fee: 10000 | 3000 | 500 | 100
+}

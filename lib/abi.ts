@@ -198,7 +198,8 @@ export const UNISWAPV3_LAUNCH_ABI = [
         type: 'address',
         internalType: 'contract MemecoinERC20'
       },
-      { name: 'tokenId', type: 'uint256', internalType: 'uint256' }
+      { name: 'tokenId', type: 'uint256', internalType: 'uint256' },
+      { name: 'amountSwapped', type: 'uint256', internalType: 'uint256' }
     ],
     stateMutability: 'payable'
   }
