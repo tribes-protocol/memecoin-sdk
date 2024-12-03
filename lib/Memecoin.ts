@@ -1,7 +1,9 @@
 import {
   SWAP_EXACT_ETH_FOR_TOKENS_ABI,
   SWAP_EXACT_TOKENS_FOR_ETH_ABI,
-  SWAP_MEMECOIN_ABI
+  SWAP_MEMECOIN_ABI,
+  UNISWAPV3_GENERATE_SALT_ABI,
+  UNISWAPV3_LAUNCH_ABI
 } from '@/abi'
 import {
   API_BASE_URL,
@@ -12,9 +14,11 @@ import {
   getSellTokensABI,
   INITIAL_RESERVE,
   INITIAL_SUPPLY,
+  LN_1_0001,
   MEME_V3,
   UNISWAP_V2_ROUTER,
   UNISWAP_V2_ROUTER_PROXY,
+  UNISWAP_V3_LAUNCHER,
   WETH_TOKEN
 } from '@/constants'
 import {
@@ -23,7 +27,8 @@ import {
   isNull,
   isRequiredNumber,
   isRequiredString,
-  isValidBigIntString
+  isValidBigIntString,
+  retry
 } from '@/functions'
 import {
   BuyFrontendParams,
@@ -33,6 +38,7 @@ import {
   EstimateTradeParams,
   EthAddress,
   EthAddressSchema,
+  GenerateSaltResultSchema,
   HexString,
   HydratedCoin,
   HydratedCoinSchema,
@@ -49,7 +55,7 @@ import {
   TradeSellParams,
   TradeSwapParams
 } from '@/types'
-import { getUniswapPair } from '@/uniswap'
+import { fetchEthereumPrice, getUniswapPair, getUniswapV3TickSpacing } from '@/uniswap'
 import { ChainId, CurrencyAmount, Percent, Token, WETH9 } from '@uniswap/sdk-core'
 import { Pair, Route, Trade } from '@uniswap/v2-sdk'
 import BigNumber from 'bignumber.js'
@@ -61,6 +67,7 @@ import {
   encodeFunctionData,
   erc20Abi,
   http,
+  Log,
   PublicClient,
   WalletCapabilities,
   WalletCapabilitiesRecord,
@@ -1066,12 +1073,12 @@ export class MemecoinSDK {
       telegram,
       discord,
       lockingDays,
-      farcasterId
+      farcasterId,
+      kind
     } = params
 
-    const memeDeployer = CURRENT_MEME_INFO.DEPLOYER
-
-    const abi = getCreateMemeABI(memeDeployer)
+    let contractAddress: EthAddress
+    let txHash: HexString
 
     const tokenData = encodeOnchainData({
       image,
@@ -1088,58 +1095,81 @@ export class MemecoinSDK {
       throw new Error('No account found')
     }
 
-    const data = encodeFunctionData({
-      abi,
-      functionName: 'CreateMeme',
-      args: [
-        name,
-        ticker,
-        tokenData,
-        INITIAL_SUPPLY,
-        INITIAL_RESERVE,
-        WETH_TOKEN.toString(),
-        UNISWAP_V2_ROUTER,
-        antiSnipeAmount > BigInt(0),
-        antiSnipeAmount,
-        BigInt(lockingDays ?? 0)
-      ]
-    })
+    switch (kind) {
+      case 'bonding-curve': {
+        const memeDeployer = CURRENT_MEME_INFO.DEPLOYER
 
-    const txParams = {
-      to: memeDeployer,
-      data,
-      account,
-      chain: base,
-      value: INITIAL_RESERVE + teamFee + antiSnipeAmount
-    }
+        const abi = getCreateMemeABI(memeDeployer)
 
-    const tx = await walletClient.sendTransaction(txParams)
+        const data = encodeFunctionData({
+          abi,
+          functionName: 'CreateMeme',
+          args: [
+            name,
+            ticker,
+            tokenData,
+            INITIAL_SUPPLY,
+            INITIAL_RESERVE,
+            WETH_TOKEN.toString(),
+            UNISWAP_V2_ROUTER,
+            antiSnipeAmount > BigInt(0),
+            antiSnipeAmount,
+            BigInt(lockingDays ?? 0)
+          ]
+        })
 
-    const receipt = await this.publicClient.waitForTransactionReceipt({
-      hash: tx,
-      confirmations: 3
-    })
+        const txParams = {
+          to: memeDeployer,
+          data,
+          account,
+          chain: base,
+          value: INITIAL_RESERVE + teamFee + antiSnipeAmount
+        }
 
-    const log = receipt.logs.find((log) => log.address.toLowerCase() === memeDeployer.toLowerCase())
-    const topic2 = log?.topics[2]
+        txHash = await walletClient.sendTransaction(txParams)
 
-    if (isNull(log)) {
-      throw new Error('Failed to find logs for create coin')
-    }
+        const receipt = await this.publicClient.waitForTransactionReceipt({
+          hash: txHash,
+          confirmations: 3
+        })
 
-    if (isNull(topic2)) {
-      throw Error('Failed to find topic 2')
-    }
+        contractAddress = this.getContractAddressFromLogs(receipt.logs, memeDeployer, 2)
 
-    const contractAddress = EthAddressSchema.parse(`0x${topic2.slice(26)}`)
+        break
+      }
+      case 'direct': {
+        const { tick, fee, salt } = params
 
-    if (isNull(contractAddress)) {
-      throw new Error('Failed to create coin')
+        const data = encodeFunctionData({
+          abi: UNISWAPV3_LAUNCH_ABI,
+          functionName: 'launch',
+          args: [name, ticker, INITIAL_SUPPLY, tick, fee, salt, account.address, tokenData]
+        })
+
+        const txParams = {
+          to: UNISWAP_V3_LAUNCHER,
+          data,
+          account,
+          chain: base,
+          value: antiSnipeAmount
+        }
+
+        txHash = await walletClient.sendTransaction(txParams)
+
+        const receipt = await this.publicClient.waitForTransactionReceipt({
+          hash: txHash,
+          confirmations: 3
+        })
+
+        contractAddress = this.getContractAddressFromLogs(receipt.logs, UNISWAP_V3_LAUNCHER, 1)
+
+        break
+      }
     }
 
     return {
       contractAddress,
-      txHash: tx
+      txHash
     }
   }
 
@@ -1170,5 +1200,67 @@ export class MemecoinSDK {
     }
 
     return BigInt(result)
+  }
+
+  async marketCapToTick(
+    marketCap: number,
+    totalSupply: number,
+    blockNumber: bigint,
+    fee: 10000 | 5000 | 3000 = 10000
+  ): Promise<number> {
+    const [tickSpacing, { price: ethPrice }] = await Promise.all([
+      getUniswapV3TickSpacing(fee, this.publicClient),
+      fetchEthereumPrice(blockNumber, this.publicClient)
+    ])
+
+    const price = new BigNumber(marketCap).dividedBy(totalSupply).dividedBy(ethPrice)
+
+    const tick = Math.log(price.toNumber()) / LN_1_0001
+
+    const roundedTick = Math.round(tick / tickSpacing) * tickSpacing
+
+    return roundedTick
+  }
+
+  async generateSalt(
+    name: string,
+    symbol: string,
+    supply: bigint,
+    data: string
+  ): Promise<HexString> {
+    const account = this.walletClient.account
+    if (isNull(account)) {
+      throw new Error('No account found')
+    }
+
+    const result = await retry(() =>
+      this.publicClient.readContract({
+        address: UNISWAP_V3_LAUNCHER,
+        abi: UNISWAPV3_GENERATE_SALT_ABI,
+        functionName: 'generateSalt',
+        args: [account.address, name, symbol, supply, data]
+      })
+    )
+
+    return GenerateSaltResultSchema.parse(result).salt
+  }
+
+  private getContractAddressFromLogs(
+    logs: Log[],
+    contractAddress: EthAddress,
+    topicIndex: number
+  ): EthAddress {
+    const log = logs.find((log) => log.address.toLowerCase() === contractAddress.toLowerCase())
+    const topic = log?.topics[topicIndex]
+
+    if (isNull(log)) {
+      throw new Error('Failed to find logs for create coin')
+    }
+
+    if (isNull(topic)) {
+      throw Error('Failed to find topic')
+    }
+
+    return EthAddressSchema.parse(`0x${topic.slice(26)}`)
   }
 }

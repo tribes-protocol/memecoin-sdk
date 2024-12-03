@@ -81,3 +81,30 @@ export function isBatchSupported(
     return false
   }
 }
+
+export function retry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  logError: boolean = true
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    let retries = 0
+    const attempt = (): void => {
+      fn()
+        .then(resolve)
+        .catch((error) => {
+          if (logError) {
+            console.error(`Error: ${error}`)
+          }
+          if (retries < maxRetries) {
+            retries++
+            setTimeout(attempt, 1000)
+          } else {
+            reject(error)
+          }
+        })
+    }
+
+    attempt()
+  })
+}

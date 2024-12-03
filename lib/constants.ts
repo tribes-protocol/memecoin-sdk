@@ -15,7 +15,17 @@ export const INITIAL_SUPPLY = parseUnits('1000000000', 18)
 export const INITIAL_RESERVE = parseUnits('0.0001', 18)
 
 export const WETH_TOKEN = EthAddressSchema.parse('0x4200000000000000000000000000000000000006') // BASE MAINNET WETH
-export const UNISWAP_V2_ROUTER = '0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24' // BASE MAINNET UNISWAP V2 ROUTER
+export const UNISWAP_V2_ROUTER = EthAddressSchema.parse(
+  '0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24'
+) // BASE MAINNET UNISWAP V2 ROUTER
+
+export const UNISWAP_V3_FACTORY = EthAddressSchema.parse(
+  '0x33128a8fC17869897dcE68Ed026d694621f6FDfD'
+) // BASE MAINNET UNISWAP V3 FACTORY
+
+export const UNISWAP_V3_LAUNCHER = EthAddressSchema.parse(
+  '0x40ad6e2979bB5E9ACaE606596969848f2c266290'
+)
 
 export interface MemeContracts {
   DEPLOYER: EthAddress
@@ -102,3 +112,5 @@ export const CapabilitiesSchema = z.object({
     })
   })
 })
+
+export const LN_1_0001 = Math.log(1.0001)
