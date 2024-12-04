@@ -1064,34 +1064,12 @@ export class MemecoinSDK {
 
     const teamFee = await this.teamFee
 
-    const {
-      antiSnipeAmount,
-      name,
-      ticker,
-      description,
-      image,
-      website,
-      twitter,
-      telegram,
-      discord,
-      lockingDays,
-      farcasterId,
-      kind
-    } = params
+    const { antiSnipeAmount, name, ticker, lockingDays, kind } = params
 
     let contractAddress: EthAddress
     let txHash: HexString
 
-    const tokenData = encodeOnchainData({
-      image,
-      description,
-      website,
-      twitter,
-      telegram,
-      discord,
-      farcasterId
-    })
-
+    const tokenData = ''
     const account = walletClient.account
     if (isNull(account)) {
       throw new Error('No account found')
