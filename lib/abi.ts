@@ -178,6 +178,23 @@ export const UNISWAPV3_GENERATE_SALT_ABI = [
   }
 ]
 
+export const UNISWAP_V3_PREDICT_TOKEN = [
+  {
+    type: 'function',
+    name: 'predictToken',
+    inputs: [
+      { name: 'deployer', type: 'address', internalType: 'address' },
+      { name: 'name', type: 'string', internalType: 'string' },
+      { name: 'symbol', type: 'string', internalType: 'string' },
+      { name: 'supply', type: 'uint256', internalType: 'uint256' },
+      { name: 'data', type: 'string', internalType: 'string' },
+      { name: 'salt', type: 'bytes32', internalType: 'bytes32' }
+    ],
+    outputs: [{ name: '', type: 'address', internalType: 'address' }],
+    stateMutability: 'view'
+  }
+]
+
 export const UNISWAPV3_LAUNCH_ABI = [
   {
     type: 'function',

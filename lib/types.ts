@@ -306,6 +306,10 @@ export type GenerateSaltParams = {
   account: EthAddress
 } & OnchainData
 
+export type PredictTokenParams = GenerateSaltParams & {
+  salt: HexString
+}
+
 export const LaunchResultSchema = z.tuple([EthAddressSchema, z.bigint(), z.bigint()])
 
 export type MarketCapToTickParams = {

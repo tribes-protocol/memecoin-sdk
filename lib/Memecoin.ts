@@ -2,6 +2,7 @@ import {
   SWAP_EXACT_ETH_FOR_TOKENS_ABI,
   SWAP_EXACT_TOKENS_FOR_ETH_ABI,
   SWAP_MEMECOIN_ABI,
+  UNISWAP_V3_PREDICT_TOKEN,
   UNISWAP_V3_ROUTER_ABI,
   UNISWAP_V3_SWAP_ABI,
   UNISWAPV3_GENERATE_SALT_ABI,
@@ -53,6 +54,7 @@ import {
   LaunchResultSchema,
   MarketCapToTickParams,
   MemecoinSDKConfig,
+  PredictTokenParams,
   SellFrontendParams,
   SwapFrontendParams,
   TradeBuyParams,
@@ -1242,6 +1244,23 @@ export class MemecoinSDK {
       salt: result[0],
       token: result[1]
     }).salt
+  }
+
+  async predictDirectLaunchToken(params: PredictTokenParams): Promise<HexString> {
+    const { account, name, symbol, supply, salt, ...onchainData } = params
+
+    const tokenData = encodeOnchainData(onchainData)
+
+    const result = await retry(() =>
+      this.publicClient.readContract({
+        address: UNISWAP_V3_LAUNCHER,
+        abi: UNISWAP_V3_PREDICT_TOKEN,
+        functionName: 'predictToken',
+        args: [account, name, symbol, supply, tokenData, salt]
+      })
+    )
+
+    return EthAddressSchema.parse(result)
   }
 
   async estimateLaunchBuy(params: EstimateLaunchBuyParams): Promise<bigint> {
