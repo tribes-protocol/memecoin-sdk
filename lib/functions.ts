@@ -1,5 +1,4 @@
 import { BASE_CHAIN_ID, CapabilitiesSchema } from '@/constants'
-import { OnchainData } from '@/types'
 import { WalletCapabilities } from 'viem'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,20 +55,6 @@ export function isValidBigIntString(str: any): boolean {
   } catch (e) {
     return false
   }
-}
-
-export function encodeOnchainData(data: OnchainData): string {
-  const separator = '@@@'
-  return [
-    data.image,
-    data.website,
-    data.twitter,
-    data.telegram,
-    data.discord,
-    data.description,
-    data.farcasterId,
-    data.farcaster
-  ].join(separator)
 }
 
 export function isBatchSupported(

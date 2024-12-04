@@ -38,15 +38,7 @@ export interface BaseLaunchCoinParams {
   name: string
   ticker: string
   antiSnipeAmount: bigint
-  image: string
-  website?: string
-  twitter?: string
-  telegram?: string
-  discord?: string
-  description?: string
   lockingDays?: number
-  farcasterId?: number
-  farcaster?: string
 }
 
 export type LaunchCoinBondingCurveParams = BaseLaunchCoinParams & {
@@ -78,19 +70,6 @@ export type ABI = {
     indexed?: boolean
   }[]
 }[]
-
-export const OnchainDataSchema = z.object({
-  image: z.string().optional(),
-  website: z.string().optional(),
-  twitter: z.string().optional(),
-  telegram: z.string().optional(),
-  discord: z.string().optional(),
-  farcaster: z.string().optional(),
-  description: z.string().optional(),
-  farcasterId: z.number().optional()
-})
-
-export type OnchainData = z.infer<typeof OnchainDataSchema>
 
 export const CoinSchema = z.object({
   id: z.number(),
@@ -304,7 +283,11 @@ export type GenerateSaltParams = {
   symbol: string
   supply: bigint
   account: EthAddress
-} & OnchainData
+}
+
+export type PredictTokenParams = GenerateSaltParams & {
+  salt: HexString
+}
 
 export const LaunchResultSchema = z.tuple([EthAddressSchema, z.bigint(), z.bigint()])
 

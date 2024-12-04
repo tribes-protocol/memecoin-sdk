@@ -2,6 +2,8 @@ import {
   SWAP_EXACT_ETH_FOR_TOKENS_ABI,
   SWAP_EXACT_TOKENS_FOR_ETH_ABI,
   SWAP_MEMECOIN_ABI,
+  UNISWAP_V3_PREDICT_TOKEN,
+  UNISWAP_V3_ROUTER_ABI,
   UNISWAP_V3_SWAP_ABI,
   UNISWAPV3_GENERATE_SALT_ABI,
   UNISWAPV3_LAUNCH_ABI
@@ -22,14 +24,7 @@ import {
   UNISWAP_V3_ROUTER,
   WETH_TOKEN
 } from '@/constants'
-import {
-  encodeOnchainData,
-  isBatchSupported,
-  isNull,
-  isRequiredNumber,
-  isValidBigIntString,
-  retry
-} from '@/functions'
+import { isBatchSupported, isNull, isRequiredNumber, isValidBigIntString, retry } from '@/functions'
 import {
   BuyFrontendParams,
   EstimateLaunchBuyParams,
@@ -52,6 +47,7 @@ import {
   LaunchResultSchema,
   MarketCapToTickParams,
   MemecoinSDKConfig,
+  PredictTokenParams,
   SellFrontendParams,
   SwapFrontendParams,
   TradeBuyParams,
@@ -597,23 +593,37 @@ export class MemecoinSDK {
     } as const
 
     const uniswapV3SwapContractCall = {
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-      abi: UNISWAP_V3_SWAP_ABI as Abi,
-      address: UNISWAP_V3_ROUTER,
+      abi: UNISWAP_V3_ROUTER_ABI,
       functionName: 'exactInputSingle',
       args: [
         {
           tokenIn: token.address,
           tokenOut: WETH_TOKEN,
           fee: 10000,
-          recipient: account.address,
+          recipient: '0x0000000000000000000000000000000000000002',
           deadline,
           amountIn: tokenAmount,
           amountOutMinimum: amountOutMin,
           sqrtPriceLimitX96: 0
         }
-      ],
-      value: fee
+      ]
+    } as const
+
+    const uniswapV3UnwrapEthContractCall = {
+      abi: UNISWAP_V3_ROUTER_ABI,
+      functionName: 'unwrapWETH9',
+      args: [amountOutMin, account.address]
+    } as const
+
+    const dataSwap1 = encodeFunctionData(uniswapV3SwapContractCall)
+    const dataSwap2 = encodeFunctionData(uniswapV3UnwrapEthContractCall)
+
+    const uniswapV3MulticallContractCall = {
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+      abi: UNISWAP_V3_ROUTER_ABI as Abi,
+      address: UNISWAP_V3_ROUTER,
+      functionName: 'multicall',
+      args: [[dataSwap1, dataSwap2]]
     } as const
 
     const swapContractCall = (() => {
@@ -621,7 +631,7 @@ export class MemecoinSDK {
         case 'univ2':
           return uniswapV2SwapContractCall
         case 'univ3':
-          return uniswapV3SwapContractCall
+          return uniswapV3MulticallContractCall
       }
     })()
 
@@ -689,7 +699,7 @@ export class MemecoinSDK {
       const txParams = {
         to: spender,
         data,
-        value: fee,
+        value: coin.dexKind === 'univ2' ? fee : 0n,
         account,
         chain: base
       }
@@ -1047,34 +1057,12 @@ export class MemecoinSDK {
 
     const teamFee = await this.teamFee
 
-    const {
-      antiSnipeAmount,
-      name,
-      ticker,
-      description,
-      image,
-      website,
-      twitter,
-      telegram,
-      discord,
-      lockingDays,
-      farcasterId,
-      kind
-    } = params
+    const { antiSnipeAmount, name, ticker, lockingDays, kind } = params
 
     let contractAddress: EthAddress
     let txHash: HexString
 
-    const tokenData = encodeOnchainData({
-      image,
-      description,
-      website,
-      twitter,
-      telegram,
-      discord,
-      farcasterId
-    })
-
+    const tokenData = ''
     const account = walletClient.account
     if (isNull(account)) {
       throw new Error('No account found')
@@ -1206,9 +1194,9 @@ export class MemecoinSDK {
   }
 
   async generateDirectLaunchSalt(params: GenerateSaltParams): Promise<HexString> {
-    const { account, name, symbol, supply, ...onchainData } = params
+    const { account, name, symbol, supply } = params
 
-    const tokenData = encodeOnchainData(onchainData)
+    const tokenData = ''
 
     const result = await retry(() =>
       this.publicClient.readContract({
@@ -1229,14 +1217,31 @@ export class MemecoinSDK {
     }).salt
   }
 
+  async predictDirectLaunchToken(params: PredictTokenParams): Promise<HexString> {
+    const { account, name, symbol, supply, salt } = params
+
+    const tokenData = ''
+
+    const result = await retry(() =>
+      this.publicClient.readContract({
+        address: UNISWAP_V3_LAUNCHER,
+        abi: UNISWAP_V3_PREDICT_TOKEN,
+        functionName: 'predictToken',
+        args: [account, name, symbol, supply, tokenData, salt]
+      })
+    )
+
+    return EthAddressSchema.parse(result)
+  }
+
   async estimateLaunchBuy(params: EstimateLaunchBuyParams): Promise<bigint> {
     if (params.kind !== 'direct') {
       throw new Error('Only direct launch is currentlysupported')
     }
 
-    const { name, ticker, antiSnipeAmount, account, tick, fee, salt, ...onchainData } = params
+    const { name, ticker, antiSnipeAmount, account, tick, fee, salt } = params
 
-    const tokenData = encodeOnchainData(onchainData)
+    const tokenData = ''
 
     const launchArgs = {
       _name: name,
