@@ -1124,7 +1124,7 @@ export class MemecoinSDK {
           data,
           account,
           chain: base,
-          value: antiSnipeAmount
+          value: antiSnipeAmount + 420n
         }
 
         txHash = await walletClient.sendTransaction(txParams)
