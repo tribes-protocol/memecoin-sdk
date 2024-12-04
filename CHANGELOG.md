@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.18
+
+### Patch Changes
+
+- 6aeebd7: increase min wei
+
 ## 0.0.17
 
 ### Patch Changes
