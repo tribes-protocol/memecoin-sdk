@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.16
+
+### Patch Changes
+
+- ab599d8: Sell for eth using multicall
+
 ## 0.0.15
 
 ### Patch Changes
