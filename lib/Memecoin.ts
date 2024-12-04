@@ -66,6 +66,7 @@ import {
   erc20Abi,
   http,
   Log,
+  parseEther,
   PublicClient,
   WalletCapabilities,
   WalletCapabilitiesRecord,
@@ -1124,7 +1125,7 @@ export class MemecoinSDK {
           data,
           account,
           chain: base,
-          value: antiSnipeAmount + 420n
+          value: antiSnipeAmount + parseEther('0.00001')
         }
 
         txHash = await walletClient.sendTransaction(txParams)
