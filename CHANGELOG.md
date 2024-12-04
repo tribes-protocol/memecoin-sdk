@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.17
+
+### Patch Changes
+
+- bbb7e01: add minor wei to launch
+
 ## 0.0.16
 
 ### Patch Changes
