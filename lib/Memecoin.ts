@@ -24,14 +24,7 @@ import {
   UNISWAP_V3_ROUTER,
   WETH_TOKEN
 } from '@/constants'
-import {
-  encodeOnchainData,
-  isBatchSupported,
-  isNull,
-  isRequiredNumber,
-  isValidBigIntString,
-  retry
-} from '@/functions'
+import { isBatchSupported, isNull, isRequiredNumber, isValidBigIntString, retry } from '@/functions'
 import {
   BuyFrontendParams,
   EstimateLaunchBuyParams,
@@ -1201,9 +1194,9 @@ export class MemecoinSDK {
   }
 
   async generateDirectLaunchSalt(params: GenerateSaltParams): Promise<HexString> {
-    const { account, name, symbol, supply, ...onchainData } = params
+    const { account, name, symbol, supply } = params
 
-    const tokenData = encodeOnchainData(onchainData)
+    const tokenData = ''
 
     const result = await retry(() =>
       this.publicClient.readContract({
@@ -1225,9 +1218,9 @@ export class MemecoinSDK {
   }
 
   async predictDirectLaunchToken(params: PredictTokenParams): Promise<HexString> {
-    const { account, name, symbol, supply, salt, ...onchainData } = params
+    const { account, name, symbol, supply, salt } = params
 
-    const tokenData = encodeOnchainData(onchainData)
+    const tokenData = ''
 
     const result = await retry(() =>
       this.publicClient.readContract({
@@ -1246,9 +1239,9 @@ export class MemecoinSDK {
       throw new Error('Only direct launch is currentlysupported')
     }
 
-    const { name, ticker, antiSnipeAmount, account, tick, fee, salt, ...onchainData } = params
+    const { name, ticker, antiSnipeAmount, account, tick, fee, salt } = params
 
-    const tokenData = encodeOnchainData(onchainData)
+    const tokenData = ''
 
     const launchArgs = {
       _name: name,
