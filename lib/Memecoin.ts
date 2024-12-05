@@ -2,6 +2,7 @@ import {
   SWAP_EXACT_ETH_FOR_TOKENS_ABI,
   SWAP_EXACT_TOKENS_FOR_ETH_ABI,
   SWAP_MEMECOIN_ABI,
+  TOKEN_CREATED_EVENT_ABI,
   UNISWAP_V3_PREDICT_TOKEN,
   UNISWAP_V3_ROUTER_ABI,
   UNISWAP_V3_SWAP_ABI,
@@ -27,6 +28,7 @@ import {
 import { isBatchSupported, isNull, isRequiredNumber, isValidBigIntString, retry } from '@/functions'
 import {
   BuyFrontendParams,
+  DexMetadata,
   EstimateLaunchBuyParams,
   EstimateSwapCoinParams,
   EstimateSwapParams,
@@ -50,6 +52,7 @@ import {
   PredictTokenParams,
   SellFrontendParams,
   SwapFrontendParams,
+  TokenCreatedEventArgsSchema,
   TradeBuyParams,
   TradeSellParams,
   TradeSwapParams
@@ -62,6 +65,7 @@ import {
   Chain,
   createPublicClient,
   createWalletClient,
+  decodeEventLog,
   encodeFunctionData,
   erc20Abi,
   http,
@@ -1062,7 +1066,7 @@ export class MemecoinSDK {
 
     let contractAddress: EthAddress
     let txHash: HexString
-
+    let dexMetadata: DexMetadata | undefined
     const tokenData = ''
     const account = walletClient.account
     if (isNull(account)) {
@@ -1137,13 +1141,16 @@ export class MemecoinSDK {
 
         contractAddress = this.getContractAddressFromLogs(receipt.logs, UNISWAP_V3_LAUNCHER, 1)
 
+        dexMetadata = this.getUniswapV3DexMetadataFromLogs(receipt.logs)
+
         break
       }
     }
 
     return {
       contractAddress,
-      txHash
+      txHash,
+      dexMetadata
     }
   }
 
@@ -1288,6 +1295,35 @@ export class MemecoinSDK {
     }
 
     return EthAddressSchema.parse(`0x${topic.slice(26)}`)
+  }
+
+  private getUniswapV3DexMetadataFromLogs(logs: Log[]): DexMetadata {
+    const log = logs.find((log) => log.address.toLowerCase() === UNISWAP_V3_LAUNCHER.toLowerCase())
+    if (isNull(log)) {
+      throw new Error('Failed to find logs for create coin')
+    }
+
+    const { data, topics } = log
+
+    const topicHash = topics[0]
+    if (isNull(topicHash)) {
+      throw new Error('Failed to find topic hash')
+    }
+
+    const parsedLog = decodeEventLog({
+      abi: TOKEN_CREATED_EVENT_ABI,
+      data,
+      topics: [topicHash, ...topics.slice(1)]
+    })
+
+    const args = TokenCreatedEventArgsSchema.parse(parsedLog.args)
+
+    const dexMetadata: DexMetadata = {
+      lpNftId: args.lpNftId.toString(),
+      lockerAddress: args.lockerAddress
+    }
+
+    return dexMetadata
   }
 
   private getUniswapContract(coin: HydratedCoin): EthAddress {
