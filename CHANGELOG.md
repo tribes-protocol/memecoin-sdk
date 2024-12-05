@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.19
+
+### Patch Changes
+
+- b6b492c: Return dexmetadata from launch
+
 ## 0.0.18
 
 ### Patch Changes
