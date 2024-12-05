@@ -702,3 +702,21 @@ export const UNISWAP_V3_ROUTER_ABI = [
   },
   { stateMutability: 'payable', type: 'receive' }
 ]
+
+export const TOKEN_CREATED_EVENT_ABI = [
+  {
+    type: 'event',
+    name: 'TokenCreated',
+    inputs: [
+      { type: 'address', name: 'tokenAddress', indexed: true },
+      { type: 'uint256', name: 'lpNftId', indexed: true },
+      { type: 'address', name: 'deployer', indexed: true },
+      { type: 'string', name: 'name', indexed: false },
+      { type: 'string', name: 'symbol', indexed: false },
+      { type: 'uint256', name: 'supply', indexed: false },
+      { type: 'uint256', name: '_supply', indexed: false },
+      { type: 'address', name: 'lockerAddress', indexed: false },
+      { type: 'string', name: 'data', indexed: false }
+    ]
+  }
+] as const

@@ -56,10 +56,32 @@ export type EstimateLaunchBuyParams = LaunchCoinDirectParams & { account: EthAdd
 
 export type LaunchCoinParams = LaunchCoinBondingCurveParams | LaunchCoinDirectParams
 
+export const DexMetadataUniv3Schema = z.object({
+  lpNftId: z.string(),
+  lockerAddress: EthAddressSchema
+})
+
+export type DexMetadata = z.infer<typeof DexMetadataUniv3Schema>
+
 export interface LaunchCoinResponse {
   contractAddress: EthAddress
   txHash: HexString
+  dexMetadata?: DexMetadata
 }
+
+export const TokenCreatedEventArgsSchema = z.object({
+  tokenAddress: EthAddressSchema,
+  lpNftId: z.bigint(),
+  deployer: EthAddressSchema,
+  name: z.string(),
+  symbol: z.string(),
+  supply: z.bigint(),
+  _supply: z.bigint(),
+  lockerAddress: EthAddressSchema,
+  data: z.string()
+})
+
+export type TokenCreatedEventArgs = z.infer<typeof TokenCreatedEventArgsSchema>
 
 export type ABI = {
   type: string
