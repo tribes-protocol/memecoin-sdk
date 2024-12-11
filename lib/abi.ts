@@ -847,45 +847,6 @@ export const BUY_BONDING_CURVE_TOKENS_ABI = [
 export const SELL_BONDING_CURVE_TOKENS_ABI = [
   {
     type: 'function',
-    name: 'buy',
-    inputs: [
-      { name: 'recipient', type: 'address', internalType: 'address' },
-      {
-        name: 'refundRecipient',
-        type: 'address',
-        internalType: 'address'
-      },
-      {
-        name: 'orderReferrer',
-        type: 'address',
-        internalType: 'address'
-      },
-      { name: 'comment', type: 'string', internalType: 'string' },
-      {
-        name: 'expectedMarketType',
-        type: 'uint8',
-        internalType: 'enum IMemecoin.MarketType'
-      },
-      {
-        name: 'minOrderSize',
-        type: 'uint256',
-        internalType: 'uint256'
-      },
-      {
-        name: 'sqrtPriceLimitX96',
-        type: 'uint160',
-        internalType: 'uint160'
-      },
-      { name: 'lockDays', type: 'uint256', internalType: 'uint256' }
-    ],
-    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
-    stateMutability: 'payable'
-  }
-]
-
-export const SELL_TOKENS_ABI = [
-  {
-    type: 'function',
     name: 'sell',
     inputs: [
       {

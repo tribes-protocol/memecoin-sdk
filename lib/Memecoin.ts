@@ -90,8 +90,6 @@ export class MemecoinSDK {
   private readonly config: MemecoinSDKConfig
   private readonly rpcUrl: string
   private readonly apiBaseUrl: string
-  private teamFee: Promise<bigint> = Promise.resolve(200000000000000n)
-  private teamFeeInterval: NodeJS.Timeout
 
   private get walletClient(): WalletClient {
     if ('walletClient' in this.config && this.config.walletClient) {
@@ -137,13 +135,6 @@ export class MemecoinSDK {
       chain: this.baseChain,
       transport: http(this.rpcUrl)
     }) as PublicClient
-
-    void this.refreshTeamFee()
-    this.teamFeeInterval = setInterval(() => this.refreshTeamFee(), 15 * 60 * 1000)
-  }
-
-  destroy(): void {
-    clearInterval(this.teamFeeInterval)
   }
 
   private async switchToBaseChain(): Promise<void> {
@@ -166,32 +157,6 @@ export class MemecoinSDK {
         console.warn('Error adding base chain', error)
       }
     }
-  }
-
-  private async refreshTeamFee(): Promise<void> {
-    try {
-      const fee = await this.fetchTeamFee()
-      this.teamFee = Promise.resolve(fee)
-    } catch (e) {
-      console.warn('Error fetching team fee', e)
-    }
-  }
-
-  private async fetchTeamFee(): Promise<bigint> {
-    const response = await fetch(`${this.apiBaseUrl}/api/coins/get-team-fee`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ memeDeployer: CURRENT_MEME_INFO.DEPLOYER })
-    })
-    const data = await response.json()
-
-    if (!isValidBigIntString(data)) {
-      throw new Error('Invalid response format')
-    }
-
-    return BigInt(data)
   }
 
   async getCoin(id: EthAddress | number): Promise<HydratedCoin> {
@@ -401,6 +366,7 @@ export class MemecoinSDK {
           account.address,
           account.address,
           affiliate ?? CURRENT_MEME_INFO.FEE_COLLECTOR,
+          '',
           0,
           minTokens,
           0,
@@ -1178,7 +1144,7 @@ export class MemecoinSDK {
         const deployData = encodeFunctionData({
           abi,
           functionName: 'deploy',
-          args: ['', name, ticker, lockingDays]
+          args: [account.address, '', name, ticker, lockingDays]
         })
 
         const txParams = {
@@ -1197,7 +1163,7 @@ export class MemecoinSDK {
         })
 
         const log = receipt.logs.find(
-          (log) => log.address.toLowerCase() === UNISWAP_V3_LAUNCHER.toLowerCase()
+          (log) => log.address.toLowerCase() === BONDING_CURVE_TOKEN_DEPLOYER.toLowerCase()
         )
         if (isNull(log)) {
           throw new Error('Failed to find logs for create coin')
