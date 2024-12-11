@@ -720,3 +720,203 @@ export const TOKEN_CREATED_EVENT_ABI = [
     ]
   }
 ] as const
+
+export const DEPLOY_TOKEN_ABI = [
+  {
+    type: 'function',
+    name: 'deploy',
+    inputs: [
+      {
+        name: '_tokenCreator',
+        type: 'address',
+        internalType: 'address'
+      },
+      { name: '_tokenURI', type: 'string', internalType: 'string' },
+      { name: '_name', type: 'string', internalType: 'string' },
+      { name: '_symbol', type: 'string', internalType: 'string' },
+      { name: '_lockDays', type: 'uint256', internalType: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'address', internalType: 'address' }],
+    stateMutability: 'payable'
+  }
+]
+
+export const BONDING_CURVE_TOKEN_CREATED_EVENT_ABI = [
+  {
+    type: 'event',
+    name: 'TokenCreated',
+    inputs: [
+      {
+        name: 'factoryAddress',
+        type: 'address',
+        indexed: true,
+        internalType: 'address'
+      },
+      {
+        name: 'tokenCreator',
+        type: 'address',
+        indexed: true,
+        internalType: 'address'
+      },
+      {
+        name: 'protocolFeeRecipient',
+        type: 'address',
+        indexed: false,
+        internalType: 'address'
+      },
+      {
+        name: 'bondingCurve',
+        type: 'address',
+        indexed: false,
+        internalType: 'address'
+      },
+      {
+        name: 'tokenURI',
+        type: 'string',
+        indexed: false,
+        internalType: 'string'
+      },
+      {
+        name: 'name',
+        type: 'string',
+        indexed: false,
+        internalType: 'string'
+      },
+      {
+        name: 'symbol',
+        type: 'string',
+        indexed: false,
+        internalType: 'string'
+      },
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        indexed: false,
+        internalType: 'address'
+      },
+      {
+        name: 'poolAddress',
+        type: 'address',
+        indexed: false,
+        internalType: 'address'
+      }
+    ],
+    anonymous: false
+  }
+]
+
+export const BUY_BONDING_CURVE_TOKENS_ABI = [
+  {
+    type: 'function',
+    name: 'buy',
+    inputs: [
+      { name: 'recipient', type: 'address', internalType: 'address' },
+      {
+        name: 'refundRecipient',
+        type: 'address',
+        internalType: 'address'
+      },
+      {
+        name: 'orderReferrer',
+        type: 'address',
+        internalType: 'address'
+      },
+      { name: 'comment', type: 'string', internalType: 'string' },
+      {
+        name: 'expectedMarketType',
+        type: 'uint8',
+        internalType: 'enum IMemecoin.MarketType'
+      },
+      {
+        name: 'minOrderSize',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'sqrtPriceLimitX96',
+        type: 'uint160',
+        internalType: 'uint160'
+      },
+      { name: 'lockDays', type: 'uint256', internalType: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'payable'
+  }
+]
+
+export const SELL_BONDING_CURVE_TOKENS_ABI = [
+  {
+    type: 'function',
+    name: 'buy',
+    inputs: [
+      { name: 'recipient', type: 'address', internalType: 'address' },
+      {
+        name: 'refundRecipient',
+        type: 'address',
+        internalType: 'address'
+      },
+      {
+        name: 'orderReferrer',
+        type: 'address',
+        internalType: 'address'
+      },
+      { name: 'comment', type: 'string', internalType: 'string' },
+      {
+        name: 'expectedMarketType',
+        type: 'uint8',
+        internalType: 'enum IMemecoin.MarketType'
+      },
+      {
+        name: 'minOrderSize',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'sqrtPriceLimitX96',
+        type: 'uint160',
+        internalType: 'uint160'
+      },
+      { name: 'lockDays', type: 'uint256', internalType: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'payable'
+  }
+]
+
+export const SELL_TOKENS_ABI = [
+  {
+    type: 'function',
+    name: 'sell',
+    inputs: [
+      {
+        name: 'tokensToSell',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      { name: 'recipient', type: 'address', internalType: 'address' },
+      {
+        name: 'orderReferrer',
+        type: 'address',
+        internalType: 'address'
+      },
+      { name: 'comment', type: 'string', internalType: 'string' },
+      {
+        name: 'expectedMarketType',
+        type: 'uint8',
+        internalType: 'enum IMemecoin.MarketType'
+      },
+      {
+        name: 'minPayoutSize',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: 'sqrtPriceLimitX96',
+        type: 'uint160',
+        internalType: 'uint160'
+      }
+    ],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'nonpayable'
+  }
+]

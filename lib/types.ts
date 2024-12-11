@@ -83,6 +83,18 @@ export const TokenCreatedEventArgsSchema = z.object({
 
 export type TokenCreatedEventArgs = z.infer<typeof TokenCreatedEventArgsSchema>
 
+export const BondingCurveTokenCreatedEventArgsSchema = z.object({
+  factoryAddress: EthAddressSchema,
+  tokenCreator: EthAddressSchema,
+  protocolFeeRecipient: EthAddressSchema,
+  bondingCurve: EthAddressSchema,
+  tokenURI: z.string(),
+  name: z.string(),
+  symbol: z.string(),
+  tokenAddress: EthAddressSchema,
+  poolAddress: EthAddressSchema
+})
+
 export type ABI = {
   type: string
   name: string
@@ -113,7 +125,7 @@ export const CoinSchema = z.object({
   name: z.string(),
   ticker: z.string(),
   description: z.string(),
-  dexKind: z.enum(['univ2', 'univ3']),
+  dexKind: z.enum(['univ2', 'univ3', 'univ3-bonding']),
   dexMetadata: z.string().nullable()
 })
 
