@@ -59,6 +59,10 @@ export const CURRENT_MEME_INFO = MEME_V3
 
 const ALL_VERSIONS = [MEME_V3]
 
+export const BONDING_CURVE_TOKEN_DEPLOYER = EthAddressSchema.parse(
+  '0xE52B27117Cf5007144433C7C82fBD7A4a755B646'
+)
+
 function findMemeVersionByMemePool(memePool: EthAddress): MemeContracts {
   for (const version of ALL_VERSIONS) {
     if (memePool === version.POOL) {
