@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.21
+
+### Patch Changes
+
+- b0b2560: update contract
+
 ## 0.0.20
 
 ### Patch Changes
