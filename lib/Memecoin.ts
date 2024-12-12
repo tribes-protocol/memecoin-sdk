@@ -16,12 +16,12 @@ import {
 import {
   API_BASE_URL,
   BONDING_CURVE_TOKEN_DEPLOYER,
-  CURRENT_MEME_INFO,
   getBuyTokensABI,
   getSellTokensABI,
   INITIAL_SUPPLY,
   LN_1_0001,
   MEME_V3,
+  MULTISIG_FEE_COLLECTOR,
   UNISWAP_V2_ROUTER_PROXY,
   UNISWAP_V3_LAUNCHER,
   UNISWAP_V3_ROUTER,
@@ -83,8 +83,6 @@ import {
 import { privateKeyToAccount } from 'viem/accounts'
 import { base } from 'viem/chains'
 import { eip5792Actions, getCapabilities, writeContracts } from 'viem/experimental'
-
-const FEE_COLLECTOR = CURRENT_MEME_INFO.FEE_COLLECTOR
 
 export class MemecoinSDK {
   private readonly config: MemecoinSDKConfig
@@ -365,7 +363,7 @@ export class MemecoinSDK {
         const args = [
           account.address,
           account.address,
-          affiliate ?? CURRENT_MEME_INFO.FEE_COLLECTOR,
+          affiliate ?? MULTISIG_FEE_COLLECTOR,
           '',
           0,
           minTokens,
@@ -398,7 +396,7 @@ export class MemecoinSDK {
         const args = [
           coin.contractAddress,
           minTokens,
-          affiliate ?? CURRENT_MEME_INFO.FEE_COLLECTOR,
+          affiliate ?? MULTISIG_FEE_COLLECTOR,
           BigInt(lockingDays ?? 0)
         ]
 
@@ -812,7 +810,7 @@ export class MemecoinSDK {
           address: poolContractAddress,
           abi,
           functionName: 'sellTokens',
-          args: [coin.contractAddress, amountIn, minETHAmount, affiliate ?? FEE_COLLECTOR]
+          args: [coin.contractAddress, amountIn, minETHAmount, affiliate ?? MULTISIG_FEE_COLLECTOR]
         }
         break
       }
@@ -822,7 +820,15 @@ export class MemecoinSDK {
           // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
           abi: SELL_BONDING_CURVE_TOKENS_ABI as Abi,
           functionName: 'sell',
-          args: [amountIn, account.address, affiliate ?? FEE_COLLECTOR, '', 0, minETHAmount, 0]
+          args: [
+            amountIn,
+            account.address,
+            affiliate ?? MULTISIG_FEE_COLLECTOR,
+            '',
+            0,
+            minETHAmount,
+            0
+          ]
         }
         break
       }
@@ -946,7 +952,7 @@ export class MemecoinSDK {
         toToken.contractAddress,
         amountIn,
         BigInt(amountOutMin),
-        affiliate ?? FEE_COLLECTOR
+        affiliate ?? MULTISIG_FEE_COLLECTOR
       ]
     } as const
 
