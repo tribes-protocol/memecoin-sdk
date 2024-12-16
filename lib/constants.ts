@@ -60,7 +60,7 @@ export const CURRENT_MEME_INFO = MEME_V3
 const ALL_VERSIONS = [MEME_V3]
 
 export const BONDING_CURVE_TOKEN_DEPLOYER = EthAddressSchema.parse(
-  '0x8925bb769f4B3aF19dd9ce000e769876A2936365'
+  '0x0e9C4E84b3ae76DA8F0ec838F0AE4f9577d7b086'
 )
 
 export const MULTISIG_FEE_COLLECTOR = EthAddressSchema.parse(
