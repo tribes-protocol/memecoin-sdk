@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.29
+
+### Patch Changes
+
+- a521e3e: bug fix
+
 ## 0.0.28
 
 ### Patch Changes
