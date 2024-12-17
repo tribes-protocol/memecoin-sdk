@@ -122,9 +122,9 @@ export const CoinSchema = z.object({
   telegram: z.string().nullable().optional(),
   discord: z.string().nullable().optional(),
   farcaster: z.string().nullable().optional(),
-  dexInitiated: z.boolean().default(false),
+  dexInitiated: z.boolean().nullable().optional(),
   dexInitiatedBlock: z.bigint().nullable().optional(),
-  censored: z.boolean().default(false),
+  censored: z.boolean().nullable().optional(),
   totalSupply: z.bigint(),
   memeDeployer: EthAddressSchema.nullable().optional(),
   memePool: EthAddressSchema.nullable().optional(),
@@ -134,7 +134,7 @@ export const CoinSchema = z.object({
   tgImageId: z.string().nullable().optional(),
   tgVideoId: z.string().nullable().optional(),
   farcasterId: z.number().nullable().optional(),
-  dexKind: z.enum(['univ2', 'univ3', 'univ3-bonding']).default('univ2'),
+  dexKind: z.enum(['univ2', 'univ3', 'univ3-bonding']),
   dexMetadata: z.string().nullable().optional()
 })
 
