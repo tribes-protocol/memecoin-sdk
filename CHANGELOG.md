@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.26
+
+### Patch Changes
+
+- f6931d2: fix types
+
 ## 0.0.25
 
 ### Patch Changes
