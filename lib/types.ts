@@ -123,9 +123,12 @@ export const CoinSchema = z.object({
   discord: z.string().nullable().optional(),
   farcaster: z.string().nullable().optional(),
   dexInitiated: z.boolean().nullable().optional(),
-  dexInitiatedBlock: z.bigint().nullable().optional(),
+  dexInitiatedBlock: z
+    .union([z.bigint(), z.string().transform((arg) => BigInt(arg))])
+    .nullable()
+    .optional(),
   censored: z.boolean().nullable().optional(),
-  totalSupply: z.bigint(),
+  totalSupply: z.union([z.bigint(), z.string().transform((arg) => BigInt(arg))]),
   memeDeployer: EthAddressSchema.nullable().optional(),
   memePool: EthAddressSchema.nullable().optional(),
   memeEventTracker: EthAddressSchema.nullable().optional(),
