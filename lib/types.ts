@@ -38,7 +38,15 @@ export interface BaseLaunchCoinParams {
   name: string
   ticker: string
   antiSnipeAmount: bigint
+  description: string
+  image: string
+  website?: string
+  twitter?: string
+  farcaster?: string
+  telegram?: string
+  discord?: string
   lockingDays?: number
+  farcasterId?: number
 }
 
 export type LaunchCoinBondingCurveParams = BaseLaunchCoinParams & {
