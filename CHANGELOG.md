@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.27
+
+### Patch Changes
+
+- 32436d9: locking days fix
+
 ## 0.0.26
 
 ### Patch Changes
