@@ -1162,7 +1162,7 @@ export class MemecoinSDK {
         const deployData = encodeFunctionData({
           abi,
           functionName: 'deploy',
-          args: [account.address, '', name, ticker, lockingDays]
+          args: [account.address, '', name, ticker, lockingDays ?? 0]
         })
 
         const txParams = {
