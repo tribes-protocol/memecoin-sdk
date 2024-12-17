@@ -66,7 +66,6 @@ export type DexMetadata = z.infer<typeof DexMetadataUniv3Schema>
 export interface LaunchCoinResponse {
   contractAddress: EthAddress
   txHash: HexString
-  dexMetadata?: DexMetadata
 }
 
 export const TokenCreatedEventArgsSchema = z.object({
@@ -107,29 +106,56 @@ export type ABI = {
 
 export const CoinSchema = z.object({
   id: z.number(),
-  createdAt: z.preprocess((arg) => (typeof arg === 'string' ? new Date(arg) : arg), z.date()),
-  contractAddress: EthAddressSchema,
-  dexInitiated: z.boolean().nullable(),
-  dexInitiatedBlock: z
-    .string()
-    .transform((arg) => BigInt(arg))
-    .nullable(),
-  creator: EthAddressSchema,
-  memeDeployer: EthAddressSchema.nullable(),
-  memePool: EthAddressSchema.nullable(),
-  memeEventTracker: EthAddressSchema.nullable(),
-  rewardsPool: EthAddressSchema.nullable(),
-  memeStorage: EthAddressSchema.nullable(),
-  totalSupply: z.string().transform((arg) => BigInt(arg)),
-  marketCap: z.string().transform((value) => BigInt(value)),
   name: z.string(),
-  ticker: z.string(),
+  ticker: z.string().max(256),
   description: z.string(),
-  dexKind: z.enum(['univ2', 'univ3', 'univ3-bonding']),
-  dexMetadata: z.string().nullable()
+  image: z.string(),
+  socialImage: z.string().nullable().optional(),
+  buyBotImage: z.string().nullable().optional(),
+  video: z.string().nullable().optional(),
+  createdAt: z.preprocess((arg) => (typeof arg === 'string' ? new Date(arg) : arg), z.date()),
+  chainId: z.number(),
+  contractAddress: EthAddressSchema,
+  creator: EthAddressSchema,
+  website: z.string().nullable().optional(),
+  twitter: z.string().nullable().optional(),
+  telegram: z.string().nullable().optional(),
+  discord: z.string().nullable().optional(),
+  farcaster: z.string().nullable().optional(),
+  dexInitiated: z.boolean().default(false),
+  dexInitiatedBlock: z.bigint().nullable().optional(),
+  censored: z.boolean().default(false),
+  totalSupply: z.bigint(),
+  memeDeployer: EthAddressSchema.nullable().optional(),
+  memePool: EthAddressSchema.nullable().optional(),
+  memeEventTracker: EthAddressSchema.nullable().optional(),
+  rewardsPool: EthAddressSchema.nullable().optional(),
+  memeStorage: EthAddressSchema.nullable().optional(),
+  tgImageId: z.string().nullable().optional(),
+  tgVideoId: z.string().nullable().optional(),
+  farcasterId: z.number().nullable().optional(),
+  dexKind: z.enum(['univ2', 'univ3', 'univ3-bonding']).default('univ2'),
+  dexMetadata: z.string().nullable().optional()
 })
 
 export type Coin = z.infer<typeof CoinSchema>
+
+export const NewCoinSchema = CoinSchema.omit({
+  id: true,
+  createdAt: true
+})
+
+export type NewCoin = z.infer<typeof NewCoinSchema>
+
+export const CreateCoinSchema = NewCoinSchema.omit({
+  censored: true,
+  dexInitiated: true,
+  dexInitiatedBlock: true,
+  dexMetadata: true,
+  contractAddress: true
+})
+
+export type CreateCoin = z.infer<typeof CreateCoinSchema>
 
 export const UserSchema = z.object({
   id: z.number(),

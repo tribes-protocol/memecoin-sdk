@@ -3,6 +3,7 @@
 import { MemecoinSDK } from '@/Memecoin'
 import {
   BuyFrontendParams,
+  CreateCoin,
   EstimateLaunchBuyParams,
   EstimateSwapParams,
   EstimateTradeParams,
@@ -31,7 +32,7 @@ interface MemecoinContextType {
   sell: (params: SellFrontendParams) => Promise<HexString>
   estimateSell: (params: EstimateTradeParams) => Promise<bigint>
   swap: (params: SwapFrontendParams) => Promise<HexString>
-  launchCoin: (params: LaunchCoinParams) => Promise<LaunchCoinResponse>
+  launchCoin: (params: LaunchCoinParams, coin: CreateCoin) => Promise<LaunchCoinResponse>
   getPair: (coin: EthAddress) => Promise<Pair>
   getERC20Allowance: (
     tokenAddress: EthAddress,
