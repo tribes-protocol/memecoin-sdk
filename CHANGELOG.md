@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.24
+
+### Patch Changes
+
+- a6f84ec: launch from sdk
+
 ## 0.0.23
 
 ### Patch Changes
