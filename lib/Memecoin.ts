@@ -38,7 +38,6 @@ import {
 import {
   BondingCurveTokenCreatedEventArgsSchema,
   BuyFrontendParams,
-  CreateCoin,
   DexMetadata,
   EstimateLaunchBuyParams,
   EstimateSwapCoinParams,
@@ -1133,7 +1132,7 @@ export class MemecoinSDK {
     }
   }
 
-  async launch(launchParams: LaunchCoinParams, coin: CreateCoin): Promise<LaunchCoinResponse> {
+  async launch(launchParams: LaunchCoinParams): Promise<LaunchCoinResponse> {
     const isBatchSupported = await this.isBatchSupported()
     if (!isBatchSupported) {
       await this.switchToBaseChain()
@@ -1141,9 +1140,7 @@ export class MemecoinSDK {
 
     const walletClient = this.walletClient
 
-    const { antiSnipeAmount, lockingDays, kind } = launchParams
-
-    const { name, ticker } = coin
+    const { antiSnipeAmount, lockingDays, kind, name, ticker } = launchParams
 
     let contractAddress: EthAddress
     let txHash: HexString
@@ -1267,12 +1264,16 @@ export class MemecoinSDK {
 
     await this.launchCoin(
       {
-        ...coin,
+        ...launchParams,
         dexMetadata: dexMetadata ? JSON.stringify(dexMetadata) : null,
         dexInitiated: kind === 'direct',
         dexInitiatedBlock: kind === 'direct' && blockNumber ? blockNumber : null,
         censored: false,
-        contractAddress
+        contractAddress,
+        creator: account.address,
+        chainId: base.id,
+        totalSupply: INITIAL_SUPPLY,
+        dexKind: kind === 'bonding-curve' ? 'univ3-bonding' : 'univ3'
       },
       txHash
     )
