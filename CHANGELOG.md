@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.25
+
+### Patch Changes
+
+- e43fd84: fix types
+
 ## 0.0.24
 
 ### Patch Changes
