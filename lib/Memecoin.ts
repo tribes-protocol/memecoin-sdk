@@ -3,9 +3,9 @@ import {
   BUY_BONDING_CURVE_TOKENS_ABI,
   DEPLOY_TOKEN_ABI,
   SELL_BONDING_CURVE_TOKENS_ABI,
+  SWAP_ABI,
   SWAP_EXACT_ETH_FOR_TOKENS_ABI,
   SWAP_EXACT_TOKENS_FOR_ETH_ABI,
-  SWAP_MEMECOIN_ABI,
   TOKEN_CREATED_EVENT_ABI,
   UNISWAP_V3_PREDICT_TOKEN,
   UNISWAP_V3_ROUTER_ABI,
@@ -16,25 +16,30 @@ import {
 import {
   API_BASE_URL,
   BONDING_CURVE_TOKEN_DEPLOYER,
+  BONDING_SWAP_CONTRACT,
   getBuyTokensABI,
   getSellTokensABI,
   INITIAL_SUPPLY,
   LN_1_0001,
-  MEME_V3,
   MULTISIG_FEE_COLLECTOR,
   UNISWAP_V2_ROUTER_PROXY,
   UNISWAP_V3_LAUNCHER,
   UNISWAP_V3_ROUTER,
   WETH_TOKEN
 } from '@/constants'
-import { isBatchSupported, isNull, isRequiredNumber, isValidBigIntString, retry } from '@/functions'
+import {
+  isBatchSupported,
+  isBigInt,
+  isNull,
+  isRequiredNumber,
+  isValidBigIntString,
+  retry
+} from '@/functions'
 import {
   BondingCurveTokenCreatedEventArgsSchema,
   BuyFrontendParams,
   DexMetadata,
   EstimateLaunchBuyParams,
-  EstimateSwapCoinParams,
-  EstimateSwapParams,
   EstimateTradeParams,
   EthAddress,
   EthAddressSchema,
@@ -44,9 +49,7 @@ import {
   HydratedCoin,
   HydratedCoinSchema,
   isBuyFrontendParams,
-  isEthAddressOrEth,
   isSellFrontendParams,
-  isSwapFrontendParams,
   LaunchCoinParams,
   LaunchCoinResponse,
   LaunchResultSchema,
@@ -54,11 +57,11 @@ import {
   MemecoinSDKConfig,
   PredictTokenParams,
   SellFrontendParams,
-  SwapFrontendParams,
+  SwapParams,
   TokenCreatedEventArgsSchema,
+  TokenPoolType,
   TradeBuyParams,
-  TradeSellParams,
-  TradeSwapParams
+  TradeSellParams
 } from '@/types'
 import { fetchEthereumPrice, getUniswapPair, getUniswapV3TickSpacing } from '@/uniswap'
 import { ChainId, Token, WETH9 } from '@uniswap/sdk-core'
@@ -458,40 +461,32 @@ export class MemecoinSDK {
     return BigInt(result)
   }
 
-  private async estimateSwapCoin(params: EstimateSwapCoinParams): Promise<bigint> {
-    const { fromToken, toToken, amountIn } = params
+  async estimateSwap(params: SwapParams): Promise<bigint> {
+    const { feeIn, feeOut, recipient, orderReferrer } = params
 
-    const response = await fetch(`${this.apiBaseUrl}/api/trades/estimate-swap`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        fromToken,
-        toToken,
-        amountIn: amountIn.toString()
-      })
+    const walletClient = this.walletClient
+
+    const { result } = await this.publicClient.simulateContract({
+      account: walletClient.account,
+      address: BONDING_SWAP_CONTRACT,
+      abi: SWAP_ABI,
+      functionName: 'swap',
+      args: [
+        {
+          ...params,
+          recipient: recipient ?? walletClient.account,
+          feeIn: feeIn ?? 0,
+          feeOut: feeOut ?? 0,
+          orderReferrer: orderReferrer ?? MULTISIG_FEE_COLLECTOR
+        }
+      ]
     })
 
-    const result = await response.json()
-
-    if (!isValidBigIntString(result)) {
+    if (!isBigInt(result)) {
       throw new Error('Invalid response format')
     }
 
-    return BigInt(result)
-  }
-
-  async estimateSwap(params: EstimateSwapParams): Promise<bigint> {
-    const { fromToken, toToken, amountIn } = params
-
-    if (fromToken === 'eth') {
-      return this.estimateBuy({ coin: toToken, amountIn, using: 'eth' })
-    } else if (toToken === 'eth') {
-      return this.estimateSell({ coin: fromToken, amountIn, using: 'eth' })
-    } else {
-      return this.estimateSwapCoin({ fromToken, toToken, amountIn })
-    }
+    return result
   }
 
   async sell(params: TradeSellParams): Promise<HexString> {
@@ -911,21 +906,31 @@ export class MemecoinSDK {
     }
   }
 
-  private async swapCoinFrontend(params: SwapFrontendParams): Promise<HexString> {
-    const { fromToken, toToken, amountIn, amountOut, slippage, affiliate } = params
+  async swap(params: SwapParams): Promise<HexString> {
+    const isBatchSupported = await this.isBatchSupported()
+    if (!isBatchSupported) {
+      await this.switchToBaseChain()
+    }
 
     const walletClient = this.walletClient
 
-    if (fromToken === 'eth' || toToken === 'eth') {
-      throw new Error('ETH is not supported as a fromToken or toToken')
-    }
+    const {
+      amountOutMinimum,
+      tokenIn,
+      amountIn,
+      orderReferrer,
+      recipient,
+      feeIn,
+      feeOut,
+      tokenInPoolType,
+      tokenOutPoolType,
+      tokenOut
+    } = params
 
-    const { allowance } = params
-
-    const amountOutMin = this.calculateMinAmountWithSlippage(amountOut, slippage)
+    const amountOutMin = this.calculateMinAmountWithSlippage(amountOutMinimum)
 
     const approveContractCall = {
-      address: fromToken.contractAddress,
+      address: tokenIn,
       abi: [
         {
           inputs: [
@@ -939,20 +944,27 @@ export class MemecoinSDK {
         }
       ],
       functionName: 'approve',
-      args: [MEME_V3.MEME_SWAP, amountIn]
+      args: [BONDING_SWAP_CONTRACT, amountIn]
     } as const
 
     const swapContractCall = {
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-      abi: SWAP_MEMECOIN_ABI as Abi,
-      address: MEME_V3.MEME_SWAP,
+      abi: SWAP_ABI as Abi,
+      address: BONDING_SWAP_CONTRACT,
       functionName: 'swap',
       args: [
-        fromToken.contractAddress,
-        toToken.contractAddress,
-        amountIn,
-        BigInt(amountOutMin),
-        affiliate ?? MULTISIG_FEE_COLLECTOR
+        {
+          tokenIn,
+          tokenOut,
+          tokenInPoolType,
+          tokenOutPoolType,
+          recipient: recipient ?? walletClient.account,
+          amountIn,
+          amountOutMin,
+          orderReferrer: orderReferrer ?? MULTISIG_FEE_COLLECTOR,
+          feeIn: feeIn ?? 0,
+          feeOut: feeOut ?? 0
+        }
       ]
     } as const
 
@@ -965,7 +977,7 @@ export class MemecoinSDK {
       const result = await writeContracts(walletClient, {
         contracts: [
           // approve
-          ...(allowance < amountIn ? [approveContractCall] : []),
+          ...(tokenInPoolType !== TokenPoolType.WETH ? [approveContractCall] : []),
           // swap
           swapContractCall
         ],
@@ -999,10 +1011,10 @@ export class MemecoinSDK {
 
       return lastReceipt.transactionHash
     } else {
-      if (allowance < amountIn) {
+      if (tokenInPoolType !== TokenPoolType.WETH) {
         const data = encodeFunctionData(approveContractCall)
         const txParams = {
-          to: fromToken.contractAddress,
+          to: tokenIn,
           data,
           account,
           chain: base
@@ -1024,7 +1036,7 @@ export class MemecoinSDK {
       const data = encodeFunctionData(swapContractCall)
 
       const txParams = {
-        to: MEME_V3.MEME_SWAP,
+        to: BONDING_SWAP_CONTRACT,
         data,
         account,
         chain: base
@@ -1043,84 +1055,6 @@ export class MemecoinSDK {
       })
 
       return receipt.transactionHash
-    }
-  }
-
-  async swap(params: TradeSwapParams): Promise<HexString> {
-    const isBatchSupported = await this.isBatchSupported()
-    if (!isBatchSupported) {
-      await this.switchToBaseChain()
-    }
-
-    const { fromToken, toToken } = params
-
-    if (fromToken === 'eth') {
-      if (isSwapFrontendParams(params)) {
-        return this.buy({
-          ...params,
-          coin: toToken,
-          using: 'eth'
-        })
-      } else {
-        const to = toToken
-        if (isEthAddressOrEth(to)) {
-          return this.buy({
-            ...params,
-            coin: to,
-            using: 'eth'
-          })
-        } else {
-          throw new Error('Invalid swap params')
-        }
-      }
-    } else if (toToken === 'eth') {
-      if (isSwapFrontendParams(params)) {
-        return this.sell({
-          ...params,
-          coin: fromToken,
-          using: 'eth'
-        })
-      } else {
-        const from = fromToken
-        if (isEthAddressOrEth(from)) {
-          return this.sell({
-            ...params,
-            coin: from,
-            using: 'eth'
-          })
-        } else {
-          throw new Error('Invalid swap params')
-        }
-      }
-    } else {
-      if (isSwapFrontendParams(params)) {
-        return this.swapCoinFrontend(params)
-      } else {
-        if (params.toToken === 'eth') {
-          throw new Error('ETH is not supported as a toToken')
-        }
-
-        const walletClient = this.walletClient
-        const address = walletClient.account?.address
-        if (isNull(address)) {
-          throw new Error('No account found')
-        }
-
-        const [from, to, amountOut, allowance] = await Promise.all([
-          this.getCoin(params.fromToken),
-          this.getCoin(params.toToken),
-          this.estimateSwap(params),
-          this.getERC20Allowance(params.fromToken, MEME_V3.MEME_SWAP, address)
-        ])
-
-        return this.swapCoinFrontend({
-          ...params,
-          fromToken: from,
-          toToken: to,
-          allowance,
-          amountOut
-        })
-      }
     }
   }
 

@@ -881,3 +881,59 @@ export const SELL_BONDING_CURVE_TOKENS_ABI = [
     stateMutability: 'nonpayable'
   }
 ]
+
+export const SWAP_ABI = [
+  {
+    type: 'function',
+    name: 'swap',
+    inputs: [
+      {
+        name: 'params',
+        type: 'tuple',
+        internalType: 'struct BondingSwap.SwapParams',
+        components: [
+          { name: 'tokenIn', type: 'address', internalType: 'address' },
+          {
+            name: 'tokenOut',
+            type: 'address',
+            internalType: 'address'
+          },
+          {
+            name: 'tokenInPoolType',
+            type: 'uint8',
+            internalType: 'enum BondingSwap.TokenPoolType'
+          },
+          {
+            name: 'tokenOutPoolType',
+            type: 'uint8',
+            internalType: 'enum BondingSwap.TokenPoolType'
+          },
+          {
+            name: 'recipient',
+            type: 'address',
+            internalType: 'address'
+          },
+          {
+            name: 'amountIn',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'amountOutMinimum',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'orderReferrer',
+            type: 'address',
+            internalType: 'address'
+          },
+          { name: 'feeIn', type: 'uint24', internalType: 'uint24' },
+          { name: 'feeOut', type: 'uint24', internalType: 'uint24' }
+        ]
+      }
+    ],
+    outputs: [{ name: 'amountOut', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'payable'
+  }
+]

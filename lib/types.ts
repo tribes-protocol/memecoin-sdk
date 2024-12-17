@@ -240,71 +240,24 @@ export interface EstimateTradeParams {
   amountIn: bigint
 }
 
-export interface EstimateSwapCoinParams {
-  fromToken: EthAddress
-  toToken: EthAddress
-  amountIn: bigint
+export enum TokenPoolType {
+  BondingCurve = 0,
+  UniswapV3 = 1,
+  UniswapV2 = 2,
+  WETH = 3
 }
 
-export type EstimateSwapParams =
-  | {
-      fromToken: EthAddress
-      toToken: EthAddress | 'eth'
-      amountIn: bigint
-    }
-  | {
-      fromToken: 'eth'
-      toToken: EthAddress
-      amountIn: bigint
-    }
-
-export type SwapFrontendParams =
-  | {
-      fromToken: HydratedCoin
-      toToken: HydratedCoin | 'eth'
-      amountIn: bigint
-      amountOut: bigint
-      allowance: bigint
-      slippage?: number
-      affiliate?: EthAddress
-      pair?: Pair
-    }
-  | {
-      fromToken: 'eth'
-      toToken: HydratedCoin
-      amountIn: bigint
-      amountOut: bigint
-      lockingDays?: number
-      slippage?: number
-      affiliate?: EthAddress
-      pair?: Pair
-    }
-
-export type SwapBackendParams =
-  | {
-      fromToken: EthAddress
-      toToken: EthAddress | 'eth'
-      amountIn: bigint
-      slippage?: number
-      affiliate?: EthAddress
-    }
-  | {
-      fromToken: 'eth'
-      toToken: EthAddress
-      amountIn: bigint
-      lockingDays?: number
-      slippage?: number
-      affiliate?: EthAddress
-    }
-
-export type TradeSwapParams = SwapFrontendParams | SwapBackendParams
-
-export function isSwapFrontendParams(params: TradeSwapParams): params is SwapFrontendParams {
-  return (
-    'amountOut' in params &&
-    isHydratedCoinOrEth(params.fromToken) &&
-    isHydratedCoinOrEth(params.toToken)
-  )
+export interface SwapParams {
+  tokenIn: EthAddress
+  tokenOut: EthAddress
+  tokenInPoolType: TokenPoolType
+  tokenOutPoolType: TokenPoolType
+  amountIn: bigint
+  amountOutMinimum: bigint
+  recipient?: EthAddress
+  orderReferrer?: EthAddress
+  feeIn?: number
+  feeOut?: number
 }
 
 export const GenerateSaltResultSchema = z.object({

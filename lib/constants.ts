@@ -67,6 +67,10 @@ export const MULTISIG_FEE_COLLECTOR = EthAddressSchema.parse(
   '0x9A142B38d483d150dB2c115b4efA5ca37aC57Ebc'
 )
 
+export const BONDING_SWAP_CONTRACT = EthAddressSchema.parse(
+  '0x0000000000000000000000000000000000000000'
+)
+
 function findMemeVersionByMemePool(memePool: EthAddress): MemeContracts {
   for (const version of ALL_VERSIONS) {
     if (memePool === version.POOL) {
