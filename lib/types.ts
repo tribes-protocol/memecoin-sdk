@@ -60,7 +60,9 @@ export type LaunchCoinDirectParams = BaseLaunchCoinParams & {
   fee: number
 }
 
-export type EstimateLaunchBuyParams = LaunchCoinDirectParams & { account: EthAddress }
+export type EstimateLaunchBuyParams = Omit<LaunchCoinDirectParams, 'description' | 'image'> & {
+  account: EthAddress
+}
 
 export type LaunchCoinParams = LaunchCoinBondingCurveParams | LaunchCoinDirectParams
 
