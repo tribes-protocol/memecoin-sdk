@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.28
+
+### Patch Changes
+
+- 9d1c851: fix launch params
+
 ## 0.0.27
 
 ### Patch Changes
