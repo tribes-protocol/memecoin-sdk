@@ -486,56 +486,17 @@ export class MemecoinSDK {
       this.getCoin(params.tokenOut)
     ])
 
-    let tokenInPoolType: TokenPoolType | undefined
-    let tokenOutPoolType: TokenPoolType | undefined
+    const tokenInData = tokenInMemecoin
+      ? this.determinePoolOfMemecoin(tokenInMemecoin)
+      : await this.findTokenWETHPool(params.tokenIn)
+    const tokenOutData = tokenOutMemecoin
+      ? this.determinePoolOfMemecoin(tokenOutMemecoin)
+      : await this.findTokenWETHPool(params.tokenOut)
 
-    let feeIn = 0
-    let feeOut = 0
-
-    if (!tokenInMemecoin) {
-      const tokenInPool = await this.findTokenWETHPool(params.tokenIn)
-      tokenInPoolType = tokenInPool.poolType
-    }
-
-    if (!tokenOutMemecoin) {
-      const tokenOutPool = await this.findTokenWETHPool(params.tokenOut)
-      tokenOutPoolType = tokenOutPool.poolType
-      feeOut = tokenOutPool.poolFee
-    }
-
-    if (tokenInMemecoin) {
-      if (!tokenInMemecoin.dexInitiated) {
-        tokenInPoolType = TokenPoolType.BondingCurve
-      }
-
-      switch (tokenInMemecoin.dexKind) {
-        case 'univ2':
-          tokenInPoolType = TokenPoolType.UniswapV2
-          break
-        case 'univ3':
-        case 'univ3-bonding':
-          feeIn = 10000
-          tokenInPoolType = TokenPoolType.UniswapV3
-          break
-      }
-    }
-
-    if (tokenOutMemecoin) {
-      if (!tokenOutMemecoin.dexInitiated) {
-        tokenOutPoolType = TokenPoolType.BondingCurve
-      }
-
-      switch (tokenOutMemecoin.dexKind) {
-        case 'univ2':
-          tokenOutPoolType = TokenPoolType.UniswapV2
-          break
-        case 'univ3':
-        case 'univ3-bonding':
-          feeOut = 10000
-          tokenOutPoolType = TokenPoolType.UniswapV3
-          break
-      }
-    }
+    const tokenInPoolType = tokenInData.poolType
+    const feeIn = tokenInData.poolFee
+    const tokenOutPoolType = tokenOutData.poolType
+    const feeOut = tokenOutData.poolFee
 
     const walletClient = this.walletClient
     const account = walletClient.account
@@ -1332,6 +1293,20 @@ export class MemecoinSDK {
     const bnSlippage = new BigNumber(100 - slippagePercentage).dividedBy(100)
     const result = bnAmount.multipliedBy(bnSlippage)
     return BigInt(result.toFixed(0))
+  }
+
+  private determinePoolOfMemecoin(memecoin: HydratedCoin): GetTokenPoolResponse {
+    if (!memecoin.dexInitiated) {
+      return { poolType: TokenPoolType.BondingCurve, poolFee: 0 }
+    }
+
+    switch (memecoin.dexKind) {
+      case 'univ2':
+        return { poolType: TokenPoolType.UniswapV2, poolFee: 0 }
+      case 'univ3':
+      case 'univ3-bonding':
+        return { poolType: TokenPoolType.UniswapV3, poolFee: 10000 }
+    }
   }
 
   async findTokenWETHPool(token: EthAddress): Promise<GetTokenPoolResponse> {
