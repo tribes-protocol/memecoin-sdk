@@ -286,6 +286,14 @@ export enum TokenPoolType {
   WETH = 3
 }
 
+export interface EstimateSwapParams {
+  tokenIn: EthAddress
+  tokenOut: EthAddress
+  amountIn: bigint
+  recipient?: EthAddress
+  orderReferrer?: EthAddress
+}
+
 export interface SwapParams {
   tokenIn: EthAddress
   tokenOut: EthAddress
@@ -321,4 +329,14 @@ export type MarketCapToTickParams = {
   marketCap: number
   totalSupply: bigint
   fee: 10000 | 3000 | 500 | 100
+}
+
+export interface GetTokenPoolResponse {
+  poolType: TokenPoolType
+  poolFee: number
+}
+
+export interface EstimateSwapResult {
+  amountOut: bigint
+  swapParams: SwapParams
 }

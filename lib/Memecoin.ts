@@ -7,6 +7,8 @@ import {
   SWAP_EXACT_ETH_FOR_TOKENS_ABI,
   SWAP_EXACT_TOKENS_FOR_ETH_ABI,
   TOKEN_CREATED_EVENT_ABI,
+  UNISWAP_V2_FACTORY_ABI,
+  UNISWAP_V3_FACTORY_ABI,
   UNISWAP_V3_PREDICT_TOKEN,
   UNISWAP_V3_ROUTER_ABI,
   UNISWAP_V3_SWAP_ABI,
@@ -22,7 +24,9 @@ import {
   INITIAL_SUPPLY,
   LN_1_0001,
   MULTISIG_FEE_COLLECTOR,
+  UNISWAP_V2_FACTORY,
   UNISWAP_V2_ROUTER_PROXY,
+  UNISWAP_V3_FACTORY,
   UNISWAP_V3_LAUNCHER,
   UNISWAP_V3_ROUTER,
   WETH_TOKEN
@@ -41,11 +45,14 @@ import {
   BuyFrontendParams,
   DexMetadata,
   EstimateLaunchBuyParams,
+  EstimateSwapParams,
+  EstimateSwapResult,
   EstimateTradeParams,
   EthAddress,
   EthAddressSchema,
   GenerateSaltParams,
   GenerateSaltResultSchema,
+  GetTokenPoolResponse,
   HexString,
   HydratedCoin,
   HydratedCoinSchema,
@@ -162,7 +169,7 @@ export class MemecoinSDK {
     }
   }
 
-  async getCoin(id: EthAddress | number): Promise<HydratedCoin> {
+  async getCoin(id: EthAddress | number): Promise<HydratedCoin | undefined> {
     if (isRequiredNumber(id)) {
       const response = await fetch(`${this.apiBaseUrl}/api/coins/get-by-id`, {
         method: 'POST',
@@ -171,6 +178,11 @@ export class MemecoinSDK {
           'Content-Type': 'application/json'
         }
       })
+
+      if (response.status === 404) {
+        return undefined
+      }
+
       const data = HydratedCoinSchema.parse(await response.json())
       return data
     }
@@ -230,6 +242,11 @@ export class MemecoinSDK {
           using: params.using
         })
       ])
+
+      if (isNull(coin)) {
+        throw new Error('Coin not found')
+      }
+
       if (coin.dexInitiated && coin.dexKind !== 'univ3-bonding') {
         return this.buyFromUniswap({
           ...params,
@@ -463,10 +480,72 @@ export class MemecoinSDK {
     return BigInt(result)
   }
 
-  async estimateSwap(params: SwapParams): Promise<bigint> {
-    const { feeIn, feeOut, recipient, orderReferrer } = params
+  async estimateSwap(params: EstimateSwapParams): Promise<EstimateSwapResult> {
+    const [tokenInMemecoin, tokenOutMemecoin] = await Promise.all([
+      this.getCoin(params.tokenIn),
+      this.getCoin(params.tokenOut)
+    ])
+
+    let tokenInPoolType: TokenPoolType | undefined
+    let tokenOutPoolType: TokenPoolType | undefined
+
+    let feeIn = 0
+    let feeOut = 0
+
+    if (!tokenInMemecoin) {
+      const tokenInPool = await this.findTokenWETHPool(params.tokenIn)
+      tokenInPoolType = tokenInPool.poolType
+    }
+
+    if (!tokenOutMemecoin) {
+      const tokenOutPool = await this.findTokenWETHPool(params.tokenOut)
+      tokenOutPoolType = tokenOutPool.poolType
+      feeOut = tokenOutPool.poolFee
+    }
+
+    if (tokenInMemecoin) {
+      if (!tokenInMemecoin.dexInitiated) {
+        tokenInPoolType = TokenPoolType.BondingCurve
+      }
+
+      switch (tokenInMemecoin.dexKind) {
+        case 'univ2':
+          tokenInPoolType = TokenPoolType.UniswapV2
+          break
+        case 'univ3':
+        case 'univ3-bonding':
+          feeIn = 10000
+          tokenInPoolType = TokenPoolType.UniswapV3
+          break
+      }
+    }
+
+    if (tokenOutMemecoin) {
+      if (!tokenOutMemecoin.dexInitiated) {
+        tokenOutPoolType = TokenPoolType.BondingCurve
+      }
+
+      switch (tokenOutMemecoin.dexKind) {
+        case 'univ2':
+          tokenOutPoolType = TokenPoolType.UniswapV2
+          break
+        case 'univ3':
+        case 'univ3-bonding':
+          feeOut = 10000
+          tokenOutPoolType = TokenPoolType.UniswapV3
+          break
+      }
+    }
 
     const walletClient = this.walletClient
+    const account = walletClient.account
+    if (isNull(account)) {
+      throw new Error('No account found')
+    }
+
+    if (isNull(tokenInPoolType) || isNull(tokenOutPoolType)) {
+      throw new Error('No pool type found')
+    }
 
     const { result } = await this.publicClient.simulateContract({
       account: walletClient.account,
@@ -475,11 +554,14 @@ export class MemecoinSDK {
       functionName: 'swap',
       args: [
         {
-          ...params,
-          recipient: recipient ?? walletClient.account,
-          feeIn: feeIn ?? 0,
-          feeOut: feeOut ?? 0,
-          orderReferrer: orderReferrer ?? MULTISIG_FEE_COLLECTOR
+          tokenIn: params.tokenIn,
+          tokenOut: params.tokenOut,
+          tokenInPoolType,
+          tokenOutPoolType,
+          recipient: params.recipient ?? walletClient.account,
+          feeIn,
+          feeOut,
+          orderReferrer: params.orderReferrer ?? MULTISIG_FEE_COLLECTOR
         }
       ]
     })
@@ -488,7 +570,17 @@ export class MemecoinSDK {
       throw new Error('Invalid response format')
     }
 
-    return result
+    return {
+      amountOut: result,
+      swapParams: {
+        ...params,
+        feeIn,
+        feeOut,
+        tokenInPoolType,
+        tokenOutPoolType,
+        amountOutMinimum: this.calculateMinAmountWithSlippage(result)
+      }
+    }
   }
 
   async sell(params: TradeSellParams): Promise<HexString> {
@@ -517,6 +609,10 @@ export class MemecoinSDK {
       const address = walletClient.account?.address
       if (isNull(address)) {
         throw new Error('No account found')
+      }
+
+      if (isNull(coin)) {
+        throw new Error('Coin not found')
       }
 
       if (coin.dexInitiated && coin.dexKind !== 'univ3-bonding') {
@@ -1236,6 +1332,42 @@ export class MemecoinSDK {
     const bnSlippage = new BigNumber(100 - slippagePercentage).dividedBy(100)
     const result = bnAmount.multipliedBy(bnSlippage)
     return BigInt(result.toFixed(0))
+  }
+
+  async findTokenWETHPool(token: EthAddress): Promise<GetTokenPoolResponse> {
+    const v2Response = await this.publicClient.readContract({
+      address: UNISWAP_V2_FACTORY,
+      abi: UNISWAP_V2_FACTORY_ABI,
+      functionName: 'getPair',
+      args: [token, WETH_TOKEN]
+    })
+
+    if (v2Response !== '0x0000000000000000000000000000000000000000') {
+      return {
+        poolType: TokenPoolType.UniswapV2,
+        poolFee: 0
+      }
+    }
+
+    const feeTiers = [500, 3000, 10000]
+
+    for (const fee of feeTiers) {
+      const v3Response = await this.publicClient.readContract({
+        address: UNISWAP_V3_FACTORY,
+        abi: UNISWAP_V3_FACTORY_ABI,
+        functionName: 'getPool',
+        args: [token, WETH_TOKEN, fee]
+      })
+
+      if (v3Response !== '0x0000000000000000000000000000000000000000') {
+        return {
+          poolType: TokenPoolType.UniswapV3,
+          poolFee: fee
+        }
+      }
+    }
+
+    throw new Error('No pool found')
   }
 
   async getERC20Allowance(

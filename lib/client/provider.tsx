@@ -4,6 +4,8 @@ import { MemecoinSDK } from '@/Memecoin'
 import {
   BuyFrontendParams,
   EstimateLaunchBuyParams,
+  EstimateSwapParams,
+  EstimateSwapResult,
   EstimateTradeParams,
   EthAddress,
   GenerateSaltParams,
@@ -22,9 +24,9 @@ import { createContext, ReactNode, useContext } from 'react'
 import { useWalletClient } from 'wagmi'
 
 interface MemecoinContextType {
-  getCoin: (id: EthAddress | number) => Promise<HydratedCoin>
+  getCoin: (id: EthAddress | number) => Promise<HydratedCoin | undefined>
   getTrending: () => Promise<HydratedCoin[]>
-  estimateSwap: (params: SwapParams) => Promise<bigint>
+  estimateSwap: (params: EstimateSwapParams) => Promise<EstimateSwapResult>
   estimateBuy: (params: EstimateTradeParams) => Promise<bigint>
   buy: (params: BuyFrontendParams) => Promise<HexString>
   sell: (params: SellFrontendParams) => Promise<HexString>

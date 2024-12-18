@@ -156,6 +156,17 @@ export const UNISWAP_V3_FACTORY_ABI = [
     outputs: [{ internalType: 'int24', name: '', type: 'int24' }],
     stateMutability: 'view',
     type: 'function'
+  },
+  {
+    inputs: [
+      { internalType: 'address', name: 'tokenA', type: 'address' },
+      { internalType: 'address', name: 'tokenB', type: 'address' },
+      { internalType: 'uint24', name: 'fee', type: 'uint24' }
+    ],
+    name: 'getPool',
+    outputs: [{ internalType: 'address', name: 'pool', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function'
   }
 ] as const
 
@@ -519,8 +530,8 @@ export const UNISWAP_V3_ROUTER_ABI = [
   {
     inputs: [
       { internalType: 'address', name: 'token', type: 'address' },
-      { internalType: 'uint256', name: 'value', type: 'uint256' },
-      { internalType: 'uint256', name: 'deadline', type: 'uint256' },
+      { internalType: 'uint256', name: 'nonce', type: 'uint256' },
+      { internalType: 'uint256', name: 'expiry', type: 'uint256' },
       { internalType: 'uint8', name: 'v', type: 'uint8' },
       { internalType: 'bytes32', name: 'r', type: 'bytes32' },
       { internalType: 'bytes32', name: 's', type: 'bytes32' }
@@ -937,3 +948,16 @@ export const SWAP_ABI = [
     stateMutability: 'payable'
   }
 ]
+
+export const UNISWAP_V2_FACTORY_ABI = [
+  {
+    inputs: [
+      { internalType: 'address', name: 'tokenA', type: 'address' },
+      { internalType: 'address', name: 'tokenB', type: 'address' }
+    ],
+    name: 'getPair',
+    outputs: [{ internalType: 'address', name: 'pair', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+] as const
