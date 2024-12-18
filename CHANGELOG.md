@@ -1,5 +1,41 @@
 # @memecoin/sdk
 
+## 0.0.29
+
+### Patch Changes
+
+- a521e3e: bug fix
+
+## 0.0.28
+
+### Patch Changes
+
+- 9d1c851: fix launch params
+
+## 0.0.27
+
+### Patch Changes
+
+- 32436d9: locking days fix
+
+## 0.0.26
+
+### Patch Changes
+
+- f6931d2: fix types
+
+## 0.0.25
+
+### Patch Changes
+
+- e43fd84: fix types
+
+## 0.0.24
+
+### Patch Changes
+
+- a6f84ec: launch from sdk
+
 ## 0.0.23
 
 ### Patch Changes

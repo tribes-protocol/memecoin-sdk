@@ -33,7 +33,8 @@ import {
   isNull,
   isRequiredNumber,
   isValidBigIntString,
-  retry
+  retry,
+  toJsonTree
 } from '@/functions'
 import {
   BondingCurveTokenCreatedEventArgsSchema,
@@ -55,6 +56,7 @@ import {
   LaunchResultSchema,
   MarketCapToTickParams,
   MemecoinSDKConfig,
+  NewCoin,
   PredictTokenParams,
   SellFrontendParams,
   SwapParams,
@@ -1058,7 +1060,7 @@ export class MemecoinSDK {
     }
   }
 
-  async launch(params: LaunchCoinParams): Promise<LaunchCoinResponse> {
+  async launch(launchParams: LaunchCoinParams): Promise<LaunchCoinResponse> {
     const isBatchSupported = await this.isBatchSupported()
     if (!isBatchSupported) {
       await this.switchToBaseChain()
@@ -1066,11 +1068,12 @@ export class MemecoinSDK {
 
     const walletClient = this.walletClient
 
-    const { antiSnipeAmount, name, ticker, lockingDays, kind } = params
+    const { antiSnipeAmount, lockingDays, kind, name, ticker } = launchParams
 
     let contractAddress: EthAddress
     let txHash: HexString
     let dexMetadata: DexMetadata | undefined
+    let blockNumber: bigint | undefined
     const tokenData = ''
     const account = walletClient.account
     if (isNull(account)) {
@@ -1084,7 +1087,7 @@ export class MemecoinSDK {
         const deployData = encodeFunctionData({
           abi,
           functionName: 'deploy',
-          args: [account.address, '', name, ticker, lockingDays]
+          args: [account.address, '', name, ticker, lockingDays ?? 0]
         })
 
         const txParams = {
@@ -1129,7 +1132,7 @@ export class MemecoinSDK {
         break
       }
       case 'direct': {
-        const { tick, fee, salt } = params
+        const { tick, fee, salt } = launchParams
 
         const launchData = encodeFunctionData({
           abi: UNISWAPV3_LAUNCH_ABI,
@@ -1179,16 +1182,52 @@ export class MemecoinSDK {
           lockerAddress: args.lockerAddress
         }
 
+        blockNumber = receipt.blockNumber
+
         contractAddress = args.tokenAddress
 
         break
       }
     }
 
+    await this.launchCoin(
+      {
+        ...launchParams,
+        dexMetadata: dexMetadata ? JSON.stringify(dexMetadata) : null,
+        dexInitiated: kind === 'direct',
+        dexInitiatedBlock: kind === 'direct' && blockNumber ? blockNumber : null,
+        censored: false,
+        contractAddress,
+        creator: account.address,
+        chainId: base.id,
+        totalSupply: INITIAL_SUPPLY,
+        dexKind: kind === 'bonding-curve' ? 'univ3-bonding' : 'univ3'
+      },
+      txHash
+    )
+
     return {
       contractAddress,
-      txHash,
-      dexMetadata
+      txHash
+    }
+  }
+
+  private async launchCoin(coin: NewCoin, txHash: HexString): Promise<void> {
+    const tree = toJsonTree({
+      coin,
+      txHash
+    })
+
+    const response = await fetch(`${this.apiBaseUrl}/api/coins/new`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(tree)
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to launch coin')
     }
   }
 
