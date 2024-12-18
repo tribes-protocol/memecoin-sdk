@@ -7,14 +7,13 @@ import {
   SWAP_EXACT_ETH_FOR_TOKENS_ABI,
   SWAP_EXACT_TOKENS_FOR_ETH_ABI,
   TOKEN_CREATED_EVENT_ABI,
-  UNISWAP_V2_FACTORY_ABI,
-  UNISWAP_V3_FACTORY_ABI,
   UNISWAP_V3_PREDICT_TOKEN,
   UNISWAP_V3_ROUTER_ABI,
   UNISWAP_V3_SWAP_ABI,
   UNISWAPV3_GENERATE_SALT_ABI,
   UNISWAPV3_LAUNCH_ABI
 } from '@/abi'
+import { MemecoinAPI } from '@/api'
 import {
   API_BASE_URL,
   BONDING_CURVE_TOKEN_DEPLOYER,
@@ -24,24 +23,12 @@ import {
   INITIAL_SUPPLY,
   LN_1_0001,
   MULTISIG_FEE_COLLECTOR,
-  UNISWAP_V2_FACTORY,
   UNISWAP_V2_ROUTER_PROXY,
-  UNISWAP_V3_FACTORY,
   UNISWAP_V3_LAUNCHER,
   UNISWAP_V3_ROUTER,
-  WETH_TOKEN,
-  ZERO_ADDRESS
+  WETH_TOKEN
 } from '@/constants'
-import {
-  compactMap,
-  isBatchSupported,
-  isBigInt,
-  isNull,
-  isRequiredNumber,
-  isValidBigIntString,
-  retry,
-  toJsonTree
-} from '@/functions'
+import { isBatchSupported, isBigInt, isNull, retry } from '@/functions'
 import {
   BondingCurveTokenCreatedEventArgsSchema,
   BuyFrontendParams,
@@ -57,7 +44,6 @@ import {
   GetTokenPoolResponse,
   HexString,
   HydratedCoin,
-  HydratedCoinSchema,
   isBuyFrontendParams,
   isSellFrontendParams,
   LaunchCoinParams,
@@ -74,7 +60,12 @@ import {
   TradeBuyParams,
   TradeSellParams
 } from '@/types'
-import { fetchEthereumPrice, getUniswapPair, getUniswapV3TickSpacing } from '@/uniswap'
+import {
+  fetchEthereumPrice,
+  findTokenWETHPool,
+  getUniswapPair,
+  getUniswapV3TickSpacing
+} from '@/uniswap'
 import { ChainId, Token, WETH9 } from '@uniswap/sdk-core'
 import BigNumber from 'bignumber.js'
 import {
@@ -101,6 +92,7 @@ export class MemecoinSDK {
   private readonly config: MemecoinSDKConfig
   private readonly rpcUrl: string
   private readonly apiBaseUrl: string
+  private readonly api: MemecoinAPI
 
   private get walletClient(): WalletClient {
     if ('walletClient' in this.config && this.config.walletClient) {
@@ -133,6 +125,7 @@ export class MemecoinSDK {
     this.config = config
     this.rpcUrl = config.rpcUrl
     this.apiBaseUrl = config.apiBaseUrl ?? API_BASE_URL
+    this.api = new MemecoinAPI(this.apiBaseUrl)
     this.baseChain = {
       ...base,
       rpcUrls: {
@@ -171,55 +164,15 @@ export class MemecoinSDK {
   }
 
   async getCoin(id: EthAddress | number): Promise<HydratedCoin | undefined> {
-    if (isRequiredNumber(id)) {
-      const response = await fetch(`${this.apiBaseUrl}/api/coins/get-by-id`, {
-        method: 'POST',
-        body: JSON.stringify({ coinId: id }),
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (response.status === 404) {
-        return undefined
-      }
-
-      const data = HydratedCoinSchema.parse(await response.json())
-      return data
-    }
-
-    const response = await fetch(`${this.apiBaseUrl}/api/coins/${id}`)
-    const data = HydratedCoinSchema.parse(await response.json())
-    return data
+    return this.api.getCoin(id)
   }
 
   async getTrending(): Promise<HydratedCoin[]> {
-    const response = await fetch(`${this.apiBaseUrl}/api/coins/trending-coins`)
-    const data = HydratedCoinSchema.array().parse(await response.json())
-    return data
+    return this.api.getTrending()
   }
 
   async estimateBuy(params: EstimateTradeParams): Promise<bigint> {
-    const { coin, amountIn } = params
-
-    const response = await fetch(`${this.apiBaseUrl}/api/coins/get-amount-out-tokens`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        memeTokenAddress: coin,
-        amountIn: amountIn.toString()
-      })
-    })
-
-    const result = await response.json()
-
-    if (!isValidBigIntString(result)) {
-      throw new Error('Invalid response format')
-    }
-
-    return BigInt(result)
+    return this.api.estimateBuy(params.coin, params.amountIn)
   }
 
   async buy(params: TradeBuyParams): Promise<HexString> {
@@ -459,26 +412,7 @@ export class MemecoinSDK {
   }
 
   async estimateSell(params: EstimateTradeParams): Promise<bigint> {
-    const { coin, amountIn } = params
-
-    const response = await fetch(`${this.apiBaseUrl}/api/coins/get-amount-out-eth`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        memeTokenAddress: coin,
-        amountIn: amountIn.toString()
-      })
-    })
-
-    const result = await response.json()
-
-    if (!isValidBigIntString(result)) {
-      throw new Error('Invalid response format')
-    }
-
-    return BigInt(result)
+    return this.api.estimateSell(params.coin, params.amountIn)
   }
 
   async estimateSwap(params: EstimateSwapParams): Promise<EstimateSwapResult> {
@@ -489,10 +423,10 @@ export class MemecoinSDK {
 
     const tokenInData = tokenInMemecoin
       ? this.determinePoolOfMemecoin(tokenInMemecoin)
-      : await this.findTokenWETHPool(params.tokenIn)
+      : await findTokenWETHPool(params.tokenIn, this.publicClient)
     const tokenOutData = tokenOutMemecoin
       ? this.determinePoolOfMemecoin(tokenOutMemecoin)
-      : await this.findTokenWETHPool(params.tokenOut)
+      : await findTokenWETHPool(params.tokenOut, this.publicClient)
 
     const tokenInPoolType = tokenInData.poolType
     const feeIn = tokenInData.poolFee
@@ -1271,22 +1205,7 @@ export class MemecoinSDK {
   }
 
   private async launchCoin(coin: NewCoin, txHash: HexString): Promise<void> {
-    const tree = toJsonTree({
-      coin,
-      txHash
-    })
-
-    const response = await fetch(`${this.apiBaseUrl}/api/coins/new`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(tree)
-    })
-
-    if (!response.ok) {
-      throw new Error('Failed to launch coin')
-    }
+    return this.api.launchCoin(coin, txHash)
   }
 
   private calculateMinAmountWithSlippage(amount: bigint, slippagePercentage: number = 5): bigint {
@@ -1310,75 +1229,12 @@ export class MemecoinSDK {
     }
   }
 
-  async findTokenWETHPool(token: EthAddress): Promise<GetTokenPoolResponse> {
-    const feeTiers = [500, 3000, 10000]
-
-    const poolPromises = feeTiers.map(async (fee) => {
-      const v3Response = await this.publicClient.readContract({
-        address: UNISWAP_V3_FACTORY,
-        abi: UNISWAP_V3_FACTORY_ABI,
-        functionName: 'getPool',
-        args: [token, WETH_TOKEN, fee]
-      })
-
-      if (v3Response !== ZERO_ADDRESS) {
-        const liquidity = await this.getPoolLiquidityAtCurrentTick(v3Response)
-        return { poolType: TokenPoolType.UniswapV3, poolFee: fee, liquidity }
-      }
-      return undefined
-    })
-
-    const poolResults = await Promise.all(poolPromises)
-    const validPools = compactMap(poolResults)
-
-    if (validPools.length === 0) {
-      const v2Response = await this.publicClient.readContract({
-        address: UNISWAP_V2_FACTORY,
-        abi: UNISWAP_V2_FACTORY_ABI,
-        functionName: 'getPair',
-        args: [token, WETH_TOKEN]
-      })
-
-      if (v2Response !== ZERO_ADDRESS) {
-        return {
-          poolType: TokenPoolType.UniswapV2,
-          poolFee: 0
-        }
-      } else {
-        throw new Error('No pool found')
-      }
-    }
-
-    const deepestPool = validPools.reduce((max, pool) =>
-      pool.liquidity > max.liquidity ? pool : max
-    )
-
-    return {
-      poolType: deepestPool.poolType,
-      poolFee: deepestPool.poolFee
-    }
-  }
-
   async getERC20Allowance(
     tokenAddress: EthAddress,
     spenderAddress: EthAddress,
     accountAddress: EthAddress
   ): Promise<bigint> {
-    const response = await fetch(`${this.apiBaseUrl}/api/coins/get-erc20-allowance`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ tokenAddress, spenderAddress, accountAddress })
-    })
-
-    const result = await response.json()
-
-    if (!isValidBigIntString(result)) {
-      throw new Error('Invalid response format')
-    }
-
-    return BigInt(result)
+    return this.api.getERC20Allowance(tokenAddress, spenderAddress, accountAddress)
   }
 
   async calculateDirectLaunchTick(params: MarketCapToTickParams): Promise<number> {
@@ -1484,49 +1340,5 @@ export class MemecoinSDK {
       case 'univ3-bonding':
         return UNISWAP_V3_ROUTER
     }
-  }
-
-  private async getPoolLiquidityAtCurrentTick(poolAddress: EthAddress): Promise<bigint> {
-    const [, tick] = await this.publicClient.readContract({
-      address: poolAddress,
-      abi: [
-        {
-          constant: true,
-          inputs: [],
-          name: 'slot0',
-          outputs: [
-            { name: 'sqrtPriceX96', type: 'uint160' },
-            { name: 'tick', type: 'int24' }
-          ],
-          payable: false,
-          stateMutability: 'view',
-          type: 'function'
-        }
-      ],
-      functionName: 'slot0',
-      args: []
-    })
-
-    const [liquidity] = await this.publicClient.readContract({
-      address: poolAddress,
-      abi: [
-        {
-          constant: true,
-          inputs: [{ name: 'tick', type: 'int24' }],
-          name: 'ticks',
-          outputs: [
-            { name: 'liquidityGross', type: 'uint128' },
-            { name: 'liquidityNet', type: 'int128' }
-          ],
-          payable: false,
-          stateMutability: 'view',
-          type: 'function'
-        }
-      ],
-      functionName: 'ticks',
-      args: [tick]
-    })
-
-    return liquidity
   }
 }

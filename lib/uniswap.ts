@@ -1,12 +1,15 @@
-import { UNISWAP_V3_FACTORY_ABI, UNISWAP_V3_POOL_ABI } from '@/abi'
+import { UNISWAP_V2_FACTORY_ABI, UNISWAP_V3_FACTORY_ABI, UNISWAP_V3_POOL_ABI } from '@/abi'
 import {
+  UNISWAP_V2_FACTORY,
   UNISWAP_V3_FACTORY,
   USDC_DECIMALS,
   WETH_DECIMALS,
-  WETH_USDC_POOL_ADDRESS
+  WETH_TOKEN,
+  WETH_USDC_POOL_ADDRESS,
+  ZERO_ADDRESS
 } from '@/constants'
-import { isNull, retry } from '@/functions'
-import { EthAddress, EthAddressSchema } from '@/types'
+import { compactMap, isNull, retry } from '@/functions'
+import { EthAddress, EthAddressSchema, GetTokenPoolResponse, TokenPoolType } from '@/types'
 import { ChainId, CurrencyAmount, Token, WETH9 } from '@uniswap/sdk-core'
 import { Pair } from '@uniswap/v2-sdk'
 import BigNumber from 'bignumber.js'
@@ -112,4 +115,103 @@ export async function getUniswapV3TickSpacing(
     console.error('Error fetching Uniswap V3 tick spacing:', error)
     throw new Error('Failed to fetch Uniswap V3 tick spacing')
   }
+}
+
+export async function findTokenWETHPool(
+  token: EthAddress,
+  publicClient: PublicClient
+): Promise<GetTokenPoolResponse> {
+  const feeTiers = [500, 3000, 10000]
+
+  const poolPromises = feeTiers.map(async (fee) => {
+    const v3Response = await publicClient.readContract({
+      address: UNISWAP_V3_FACTORY,
+      abi: UNISWAP_V3_FACTORY_ABI,
+      functionName: 'getPool',
+      args: [token, WETH_TOKEN, fee]
+    })
+
+    if (v3Response !== ZERO_ADDRESS) {
+      const liquidity = await getPoolLiquidityAtCurrentTick(v3Response, publicClient)
+      return { poolType: TokenPoolType.UniswapV3, poolFee: fee, liquidity }
+    }
+    return undefined
+  })
+
+  const poolResults = await Promise.all(poolPromises)
+  const validPools = compactMap(poolResults)
+
+  if (validPools.length === 0) {
+    const v2Response = await publicClient.readContract({
+      address: UNISWAP_V2_FACTORY,
+      abi: UNISWAP_V2_FACTORY_ABI,
+      functionName: 'getPair',
+      args: [token, WETH_TOKEN]
+    })
+
+    if (v2Response !== ZERO_ADDRESS) {
+      return {
+        poolType: TokenPoolType.UniswapV2,
+        poolFee: 0
+      }
+    } else {
+      throw new Error('No pool found')
+    }
+  }
+
+  const deepestPool = validPools.reduce((max, pool) =>
+    pool.liquidity > max.liquidity ? pool : max
+  )
+
+  return {
+    poolType: deepestPool.poolType,
+    poolFee: deepestPool.poolFee
+  }
+}
+
+async function getPoolLiquidityAtCurrentTick(
+  poolAddress: EthAddress,
+  publicClient: PublicClient
+): Promise<bigint> {
+  const [, tick] = await publicClient.readContract({
+    address: poolAddress,
+    abi: [
+      {
+        constant: true,
+        inputs: [],
+        name: 'slot0',
+        outputs: [
+          { name: 'sqrtPriceX96', type: 'uint160' },
+          { name: 'tick', type: 'int24' }
+        ],
+        payable: false,
+        stateMutability: 'view',
+        type: 'function'
+      }
+    ],
+    functionName: 'slot0',
+    args: []
+  })
+
+  const [liquidity] = await publicClient.readContract({
+    address: poolAddress,
+    abi: [
+      {
+        constant: true,
+        inputs: [{ name: 'tick', type: 'int24' }],
+        name: 'ticks',
+        outputs: [
+          { name: 'liquidityGross', type: 'uint128' },
+          { name: 'liquidityNet', type: 'int128' }
+        ],
+        payable: false,
+        stateMutability: 'view',
+        type: 'function'
+      }
+    ],
+    functionName: 'ticks',
+    args: [tick]
+  })
+
+  return liquidity
 }
