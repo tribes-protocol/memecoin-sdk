@@ -14,7 +14,7 @@ import {
 } from '@/types'
 import { UniswapV2 } from '@/uniswap/v2'
 import { UniswapV3 } from '@/uniswap/v3'
-import LRUCache from 'lru-cache'
+import { LRUCache } from 'lru-cache'
 import { Abi, encodeFunctionData, PublicClient, WalletClient } from 'viem'
 import { base } from 'viem/chains'
 import { eip5792Actions, writeContracts } from 'viem/experimental'
@@ -22,7 +22,7 @@ import { eip5792Actions, writeContracts } from 'viem/experimental'
 export class TokenSwapper {
   private poolCache = new LRUCache<EthAddress, Promise<ResolveTokenPoolResponse>>({
     max: 100,
-    maxAge: 1000 * 60 * 5 // 5 mins
+    ttl: 1000 * 60 * 5 // 5 mins
   })
 
   constructor(
