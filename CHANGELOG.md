@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.30
+
+### Patch Changes
+
+- 8555dcc: swapper
+
 ## 0.0.29
 
 ### Patch Changes
