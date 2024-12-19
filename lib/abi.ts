@@ -156,6 +156,17 @@ export const UNISWAP_V3_FACTORY_ABI = [
     outputs: [{ internalType: 'int24', name: '', type: 'int24' }],
     stateMutability: 'view',
     type: 'function'
+  },
+  {
+    inputs: [
+      { internalType: 'address', name: 'tokenA', type: 'address' },
+      { internalType: 'address', name: 'tokenB', type: 'address' },
+      { internalType: 'uint24', name: 'fee', type: 'uint24' }
+    ],
+    name: 'getPool',
+    outputs: [{ internalType: 'address', name: 'pool', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function'
   }
 ] as const
 
@@ -519,8 +530,8 @@ export const UNISWAP_V3_ROUTER_ABI = [
   {
     inputs: [
       { internalType: 'address', name: 'token', type: 'address' },
-      { internalType: 'uint256', name: 'value', type: 'uint256' },
-      { internalType: 'uint256', name: 'deadline', type: 'uint256' },
+      { internalType: 'uint256', name: 'nonce', type: 'uint256' },
+      { internalType: 'uint256', name: 'expiry', type: 'uint256' },
       { internalType: 'uint8', name: 'v', type: 'uint8' },
       { internalType: 'bytes32', name: 'r', type: 'bytes32' },
       { internalType: 'bytes32', name: 's', type: 'bytes32' }
@@ -879,5 +890,141 @@ export const SELL_BONDING_CURVE_TOKENS_ABI = [
     ],
     outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
     stateMutability: 'nonpayable'
+  }
+]
+
+export const SWAP_ABI = [
+  {
+    type: 'function',
+    name: 'estimateSwap',
+    inputs: [
+      {
+        name: 'params',
+        type: 'tuple',
+        internalType: 'struct TokenSwapper.SwapParams',
+        components: [
+          { name: 'tokenIn', type: 'address', internalType: 'address' },
+          {
+            name: 'tokenOut',
+            type: 'address',
+            internalType: 'address'
+          },
+          {
+            name: 'tokenInPoolType',
+            type: 'uint8',
+            internalType: 'enum TokenSwapper.TokenPoolType'
+          },
+          {
+            name: 'tokenOutPoolType',
+            type: 'uint8',
+            internalType: 'enum TokenSwapper.TokenPoolType'
+          },
+          {
+            name: 'recipient',
+            type: 'address',
+            internalType: 'address'
+          },
+          {
+            name: 'amountIn',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'amountOutMinimum',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'orderReferrer',
+            type: 'address',
+            internalType: 'address'
+          },
+          { name: 'feeIn', type: 'uint24', internalType: 'uint24' },
+          { name: 'feeOut', type: 'uint24', internalType: 'uint24' }
+        ]
+      }
+    ],
+    outputs: [{ name: 'amountOut', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'nonpayable'
+  },
+  {
+    type: 'function',
+    name: 'swap',
+    inputs: [
+      {
+        name: 'params',
+        type: 'tuple',
+        internalType: 'struct BondingSwap.SwapParams',
+        components: [
+          { name: 'tokenIn', type: 'address', internalType: 'address' },
+          {
+            name: 'tokenOut',
+            type: 'address',
+            internalType: 'address'
+          },
+          {
+            name: 'tokenInPoolType',
+            type: 'uint8',
+            internalType: 'enum BondingSwap.TokenPoolType'
+          },
+          {
+            name: 'tokenOutPoolType',
+            type: 'uint8',
+            internalType: 'enum BondingSwap.TokenPoolType'
+          },
+          {
+            name: 'recipient',
+            type: 'address',
+            internalType: 'address'
+          },
+          {
+            name: 'amountIn',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'amountOutMinimum',
+            type: 'uint256',
+            internalType: 'uint256'
+          },
+          {
+            name: 'orderReferrer',
+            type: 'address',
+            internalType: 'address'
+          },
+          { name: 'feeIn', type: 'uint24', internalType: 'uint24' },
+          { name: 'feeOut', type: 'uint24', internalType: 'uint24' }
+        ]
+      }
+    ],
+    outputs: [{ name: 'amountOut', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'payable'
+  }
+]
+
+export const UNISWAP_V2_FACTORY_ABI = [
+  {
+    inputs: [
+      { internalType: 'address', name: 'tokenA', type: 'address' },
+      { internalType: 'address', name: 'tokenB', type: 'address' }
+    ],
+    name: 'getPair',
+    outputs: [{ internalType: 'address', name: 'pair', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
+] as const
+
+export const UNISWAP_V2_PAIR_ABI = [
+  {
+    constant: true,
+    inputs: [],
+    name: 'getReserves',
+    outputs: [
+      { name: 'reserve0', type: 'uint112' },
+      { name: 'reserve1', type: 'uint112' },
+      { name: 'blockTimestampLast', type: 'uint32' }
+    ],
+    type: 'function'
   }
 ]

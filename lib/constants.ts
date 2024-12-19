@@ -15,6 +15,13 @@ export const INITIAL_SUPPLY = parseUnits('1000000000', 18)
 export const INITIAL_RESERVE = parseUnits('0.0001', 18)
 
 export const WETH_TOKEN = EthAddressSchema.parse('0x4200000000000000000000000000000000000006') // BASE MAINNET WETH
+
+export const ZERO_ADDRESS = EthAddressSchema.parse('0x0000000000000000000000000000000000000000')
+
+export const UNISWAP_V2_FACTORY = EthAddressSchema.parse(
+  '0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6'
+) // BASE MAINNET UNISWAP V2 FACTORY
+
 export const UNISWAP_V2_ROUTER = EthAddressSchema.parse(
   '0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24'
 ) // BASE MAINNET UNISWAP V2 ROUTER
@@ -66,6 +73,10 @@ export const BONDING_CURVE_TOKEN_DEPLOYER = EthAddressSchema.parse(
 export const MULTISIG_FEE_COLLECTOR = EthAddressSchema.parse(
   '0x9A142B38d483d150dB2c115b4efA5ca37aC57Ebc'
 )
+
+export const SWAPPER_CONTRACT = EthAddressSchema.parse('0x01c3a265E70335e37BF78C9F492eA68e057D3810')
+
+export const WETH_ADDRESS = EthAddressSchema.parse('0x4200000000000000000000000000000000000006')
 
 function findMemeVersionByMemePool(memePool: EthAddress): MemeContracts {
   for (const version of ALL_VERSIONS) {
@@ -126,3 +137,5 @@ export const CapabilitiesSchema = z.object({
 })
 
 export const LN_1_0001 = Math.log(1.0001)
+
+export const UNISWAP_FEE_TIERS = [500, 3000, 10000]
