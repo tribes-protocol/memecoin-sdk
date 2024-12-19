@@ -342,3 +342,9 @@ export interface SwapEstimation {
   amountOut: bigint
   swapParams: SwapParams
 }
+
+export interface WETHPoolLiquidity {
+  poolType: TokenPoolType
+  poolFee: number
+  liquidity: bigint
+}

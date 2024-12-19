@@ -1,14 +1,7 @@
-import { SWAP_ABI, UNISWAP_V2_FACTORY_ABI, UNISWAP_V3_FACTORY_ABI } from '@/abi'
+import { SWAP_ABI } from '@/abi'
 import { MemecoinAPI } from '@/api'
-import {
-  MULTISIG_FEE_COLLECTOR,
-  SWAPPER_CONTRACT,
-  UNISWAP_V2_FACTORY,
-  UNISWAP_V3_FACTORY,
-  WETH_TOKEN,
-  ZERO_ADDRESS
-} from '@/constants'
-import { calculateMinAmountWithSlippage, compactMap, isBigInt, isNull } from '@/functions'
+import { MULTISIG_FEE_COLLECTOR, SWAPPER_CONTRACT } from '@/constants'
+import { calculateMinAmountWithSlippage, isBigInt, isNull } from '@/functions'
 import {
   EstimateSwapParams,
   EthAddress,
@@ -19,6 +12,7 @@ import {
   SwapParams,
   TokenPoolType
 } from '@/types'
+import { UniswapV2 } from '@/uniswapv2'
 import { UniswapV3 } from '@/uniswapv3'
 import { Abi, encodeFunctionData, PublicClient, WalletClient } from 'viem'
 import { base } from 'viem/chains'
@@ -26,6 +20,7 @@ import { eip5792Actions, writeContracts } from 'viem/experimental'
 
 export class TokenSwapper {
   private readonly uniswapV3: UniswapV3
+  private readonly uniswapV2: UniswapV2
 
   constructor(
     private readonly publicClient: PublicClient,
@@ -33,6 +28,7 @@ export class TokenSwapper {
     private readonly api: MemecoinAPI
   ) {
     this.uniswapV3 = new UniswapV3(this.publicClient)
+    this.uniswapV2 = new UniswapV2(this.publicClient)
   }
 
   async estimateSwap(params: EstimateSwapParams): Promise<SwapEstimation> {
@@ -45,12 +41,14 @@ export class TokenSwapper {
       this.api.getCoin(tokenOut)
     ])
 
-    const tokenInData = tokenInMemecoin
-      ? this.resolvePoolOfMemecoin(tokenInMemecoin)
-      : await this.resolveTokenWETHPool(tokenIn)
-    const tokenOutData = tokenOutMemecoin
-      ? this.resolvePoolOfMemecoin(tokenOutMemecoin)
-      : await this.resolveTokenWETHPool(tokenOut)
+    const [tokenInData, tokenOutData] = await Promise.all([
+      tokenInMemecoin
+        ? this.resolvePoolOfMemecoin(tokenInMemecoin)
+        : this.resolveTokenWETHPool(tokenIn),
+      tokenOutMemecoin
+        ? this.resolvePoolOfMemecoin(tokenOutMemecoin)
+        : this.resolveTokenWETHPool(tokenOut)
+    ])
 
     const tokenInPoolType = tokenInData.poolType
     const feeIn = tokenInData.poolFee
@@ -267,45 +265,19 @@ export class TokenSwapper {
   private async resolveTokenWETHPool(token: EthAddress): Promise<ResolveTokenPoolResponse> {
     const feeTiers = [500, 3000, 10000]
 
-    const poolPromises = feeTiers.map(async (fee) => {
-      const v3Response = await this.publicClient.readContract({
-        address: UNISWAP_V3_FACTORY,
-        abi: UNISWAP_V3_FACTORY_ABI,
-        functionName: 'getPool',
-        args: [token, WETH_TOKEN, fee]
-      })
+    const poolPromises = feeTiers.map((fee) => this.uniswapV3.getWETHPoolLiquidity(token, fee))
 
-      if (v3Response !== ZERO_ADDRESS) {
-        const liquidity = await this.uniswapV3.getPoolLiquidityAtCurrentTick(v3Response)
-        return { poolType: TokenPoolType.UniswapV3, poolFee: fee, liquidity }
-      }
-      return undefined
-    })
+    const v2Promise = this.uniswapV2.getWETHPoolLiquidity(token)
 
-    const poolResults = await Promise.all(poolPromises)
-    const validPools = compactMap(poolResults)
+    const poolResults = await Promise.all([...poolPromises, v2Promise])
 
-    if (validPools.length === 0) {
-      const v2Response = await this.publicClient.readContract({
-        address: UNISWAP_V2_FACTORY,
-        abi: UNISWAP_V2_FACTORY_ABI,
-        functionName: 'getPair',
-        args: [token, WETH_TOKEN]
-      })
-
-      if (v2Response !== ZERO_ADDRESS) {
-        return {
-          poolType: TokenPoolType.UniswapV2,
-          poolFee: 0
-        }
-      } else {
-        throw new Error('No pool found')
-      }
-    }
-
-    const deepestPool = validPools.reduce((max, pool) =>
+    const deepestPool = poolResults.reduce((max, pool) =>
       pool.liquidity > max.liquidity ? pool : max
     )
+
+    if (deepestPool.liquidity === 0n) {
+      throw new Error('No pool found')
+    }
 
     return {
       poolType: deepestPool.poolType,
