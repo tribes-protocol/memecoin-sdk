@@ -71,11 +71,10 @@ export class TokenSwapper {
   async estimateSwap(params: EstimateSwapParams): Promise<SwapEstimation> {
     const { tokenIn, tokenOut, amountIn, address, recipient, orderReferrer, slippage } = params
 
-    const allowance = await this.api.getERC20Allowance(tokenIn, SWAPPER_CONTRACT, address)
-
-    const [tokenInData, tokenOutData] = await Promise.all([
+    const [tokenInData, tokenOutData, allowance] = await Promise.all([
       this.getPool(tokenIn),
-      this.getPool(tokenOut)
+      this.getPool(tokenOut),
+      this.api.getERC20Allowance(tokenIn, SWAPPER_CONTRACT, address)
     ])
 
     const tokenInPoolType = tokenInData.poolType
