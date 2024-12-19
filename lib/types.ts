@@ -293,6 +293,7 @@ export interface EstimateSwapParams {
   address: EthAddress
   recipient?: EthAddress
   orderReferrer?: EthAddress
+  slippage?: number
 }
 
 export interface SwapParams {

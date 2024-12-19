@@ -27,6 +27,10 @@ export class MemecoinAPI {
     }
 
     const response = await fetch(`${this.apiBaseUrl}/api/coins/${id}`)
+    if (response.status === 404) {
+      return undefined
+    }
+
     const data = HydratedCoinSchema.parse(await response.json())
     return data
   }

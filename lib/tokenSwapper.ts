@@ -1,6 +1,6 @@
 import { SWAP_ABI } from '@/abi'
 import { MemecoinAPI } from '@/api'
-import { MULTISIG_FEE_COLLECTOR, SWAPPER_CONTRACT } from '@/constants'
+import { MULTISIG_FEE_COLLECTOR, SWAPPER_CONTRACT, WETH_ADDRESS } from '@/constants'
 import { calculateMinAmountWithSlippage, isBigInt, isNull } from '@/functions'
 import {
   EstimateSwapParams,
@@ -34,7 +34,7 @@ export class TokenSwapper {
   ) {}
 
   async estimateSwap(params: EstimateSwapParams): Promise<SwapEstimation> {
-    const { tokenIn, tokenOut, amountIn, address, recipient, orderReferrer } = params
+    const { tokenIn, tokenOut, amountIn, address, recipient, orderReferrer, slippage } = params
 
     const allowance = await this.api.getERC20Allowance(tokenIn, SWAPPER_CONTRACT, address)
 
@@ -46,10 +46,14 @@ export class TokenSwapper {
     const [tokenInData, tokenOutData] = await Promise.all([
       tokenInMemecoin
         ? this.resolvePoolOfMemecoin(tokenInMemecoin)
-        : this.resolveTokenWETHPool(tokenIn),
+        : tokenIn === WETH_ADDRESS
+          ? { poolType: TokenPoolType.WETH, poolFee: 0 }
+          : this.resolveTokenWETHPool(tokenIn),
       tokenOutMemecoin
         ? this.resolvePoolOfMemecoin(tokenOutMemecoin)
-        : this.resolveTokenWETHPool(tokenOut)
+        : tokenOut === WETH_ADDRESS
+          ? { poolType: TokenPoolType.WETH, poolFee: 0 }
+          : this.resolveTokenWETHPool(tokenOut)
     ])
 
     const tokenInPoolType = tokenInData.poolType
@@ -65,7 +69,7 @@ export class TokenSwapper {
       account: address,
       address: SWAPPER_CONTRACT,
       abi: SWAP_ABI,
-      functionName: 'swap',
+      functionName: 'estimateSwap',
       args: [
         {
           tokenIn,
@@ -95,7 +99,7 @@ export class TokenSwapper {
         feeOut,
         tokenInPoolType,
         tokenOutPoolType,
-        amountOutMinimum: calculateMinAmountWithSlippage(result)
+        amountOutMinimum: calculateMinAmountWithSlippage(result, slippage)
       }
     }
   }
@@ -150,7 +154,7 @@ export class TokenSwapper {
           tokenOutPoolType,
           recipient: recipient ?? walletClient.account,
           amountIn,
-          amountOutMin,
+          amountOutMinimum: amountOutMin,
           orderReferrer: orderReferrer ?? MULTISIG_FEE_COLLECTOR,
           feeIn: feeIn ?? 0,
           feeOut: feeOut ?? 0
