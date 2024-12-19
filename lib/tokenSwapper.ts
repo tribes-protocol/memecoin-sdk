@@ -14,6 +14,7 @@ import {
 } from '@/types'
 import { UniswapV2 } from '@/uniswapv2'
 import { UniswapV3 } from '@/uniswapv3'
+import LRUCache from 'lru-cache'
 import { Abi, encodeFunctionData, PublicClient, WalletClient } from 'viem'
 import { base } from 'viem/chains'
 import { eip5792Actions, writeContracts } from 'viem/experimental'
@@ -21,6 +22,11 @@ import { eip5792Actions, writeContracts } from 'viem/experimental'
 export class TokenSwapper {
   private readonly uniswapV3: UniswapV3
   private readonly uniswapV2: UniswapV2
+
+  private poolCache = new LRUCache<EthAddress, Promise<ResolveTokenPoolResponse>>({
+    max: 100,
+    maxAge: 1000 * 60 * 5 // 5 mins
+  })
 
   constructor(
     private readonly publicClient: PublicClient,
@@ -263,25 +269,36 @@ export class TokenSwapper {
   }
 
   private async resolveTokenWETHPool(token: EthAddress): Promise<ResolveTokenPoolResponse> {
-    const feeTiers = [500, 3000, 10000]
-
-    const poolPromises = feeTiers.map((fee) => this.uniswapV3.getWETHPoolLiquidity(token, fee))
-
-    const v2Promise = this.uniswapV2.getWETHPoolLiquidity(token)
-
-    const poolResults = await Promise.all([...poolPromises, v2Promise])
-
-    const deepestPool = poolResults.reduce((max, pool) =>
-      pool.liquidity > max.liquidity ? pool : max
-    )
-
-    if (deepestPool.liquidity === 0n) {
-      throw new Error('No pool found')
+    const cachedPool = this.poolCache.get(token)
+    if (cachedPool) {
+      return cachedPool
     }
 
-    return {
-      poolType: deepestPool.poolType,
-      poolFee: deepestPool.poolFee
-    }
+    const poolPromise = (async () => {
+      const feeTiers = [500, 3000, 10000]
+
+      const v3PoolPromises = feeTiers.map((fee) => this.uniswapV3.getWETHPoolLiquidity(token, fee))
+
+      const v2Promise = this.uniswapV2.getWETHPoolLiquidity(token)
+
+      const poolResults = await Promise.all([...v3PoolPromises, v2Promise])
+
+      const deepestPool = poolResults.reduce((max, pool) =>
+        pool.liquidity > max.liquidity ? pool : max
+      )
+
+      if (deepestPool.liquidity === 0n) {
+        throw new Error('No pool found')
+      }
+
+      return {
+        poolType: deepestPool.poolType,
+        poolFee: deepestPool.poolFee
+      }
+    })()
+
+    this.poolCache.set(token, poolPromise)
+
+    return poolPromise
   }
 }
