@@ -1,4 +1,5 @@
 import { BASE_CHAIN_ID, CapabilitiesSchema } from '@/constants'
+import BigNumber from 'bignumber.js'
 import { WalletCapabilities } from 'viem'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -135,4 +136,14 @@ export function toJsonTree(obj: any): any {
 
   // transform each value for objects
   return Object.fromEntries(Object.entries(obj).map(([key, val]) => [key, toJsonTree(val)]))
+}
+
+export function calculateMinAmountWithSlippage(
+  amount: bigint,
+  slippagePercentage: number = 5
+): bigint {
+  const bnAmount = new BigNumber(amount.toString())
+  const bnSlippage = new BigNumber(100 - slippagePercentage).dividedBy(100)
+  const result = bnAmount.multipliedBy(bnSlippage)
+  return BigInt(result.toFixed(0))
 }

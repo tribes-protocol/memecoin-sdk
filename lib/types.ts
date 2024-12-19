@@ -290,11 +290,13 @@ export interface EstimateSwapParams {
   tokenIn: EthAddress
   tokenOut: EthAddress
   amountIn: bigint
+  address: EthAddress
   recipient?: EthAddress
   orderReferrer?: EthAddress
 }
 
 export interface SwapParams {
+  allowance: bigint
   tokenIn: EthAddress
   tokenOut: EthAddress
   tokenInPoolType: TokenPoolType
@@ -331,12 +333,12 @@ export type MarketCapToTickParams = {
   fee: 10000 | 3000 | 500 | 100
 }
 
-export interface GetTokenPoolResponse {
+export interface ResolveTokenPoolResponse {
   poolType: TokenPoolType
   poolFee: number
 }
 
-export interface EstimateSwapResult {
+export interface SwapEstimation {
   amountOut: bigint
   swapParams: SwapParams
 }

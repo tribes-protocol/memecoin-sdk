@@ -5,7 +5,6 @@ import {
   BuyFrontendParams,
   EstimateLaunchBuyParams,
   EstimateSwapParams,
-  EstimateSwapResult,
   EstimateTradeParams,
   EthAddress,
   GenerateSaltParams,
@@ -16,6 +15,7 @@ import {
   MarketCapToTickParams,
   PredictTokenParams,
   SellFrontendParams,
+  SwapEstimation,
   SwapParams
 } from '@/types'
 import { getUniswapPair } from '@/uniswap'
@@ -26,7 +26,7 @@ import { useWalletClient } from 'wagmi'
 interface MemecoinContextType {
   getCoin: (id: EthAddress | number) => Promise<HydratedCoin | undefined>
   getTrending: () => Promise<HydratedCoin[]>
-  estimateSwap: (params: EstimateSwapParams) => Promise<EstimateSwapResult>
+  estimateSwap: (params: EstimateSwapParams) => Promise<SwapEstimation>
   estimateBuy: (params: EstimateTradeParams) => Promise<bigint>
   buy: (params: BuyFrontendParams) => Promise<HexString>
   sell: (params: SellFrontendParams) => Promise<HexString>

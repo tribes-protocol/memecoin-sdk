@@ -3,61 +3,44 @@ import {
   BUY_BONDING_CURVE_TOKENS_ABI,
   DEPLOY_TOKEN_ABI,
   SELL_BONDING_CURVE_TOKENS_ABI,
-  SWAP_ABI,
   SWAP_EXACT_ETH_FOR_TOKENS_ABI,
   SWAP_EXACT_TOKENS_FOR_ETH_ABI,
   TOKEN_CREATED_EVENT_ABI,
-  UNISWAP_V2_FACTORY_ABI,
-  UNISWAP_V3_FACTORY_ABI,
   UNISWAP_V3_PREDICT_TOKEN,
   UNISWAP_V3_ROUTER_ABI,
   UNISWAP_V3_SWAP_ABI,
   UNISWAPV3_GENERATE_SALT_ABI,
   UNISWAPV3_LAUNCH_ABI
 } from '@/abi'
+import { MemecoinAPI } from '@/api'
 import {
   API_BASE_URL,
   BONDING_CURVE_TOKEN_DEPLOYER,
-  BONDING_SWAP_CONTRACT,
   getBuyTokensABI,
   getSellTokensABI,
   INITIAL_SUPPLY,
   LN_1_0001,
   MULTISIG_FEE_COLLECTOR,
-  UNISWAP_V2_FACTORY,
   UNISWAP_V2_ROUTER_PROXY,
-  UNISWAP_V3_FACTORY,
   UNISWAP_V3_LAUNCHER,
   UNISWAP_V3_ROUTER,
-  WETH_TOKEN,
-  ZERO_ADDRESS
+  WETH_TOKEN
 } from '@/constants'
-import {
-  compactMap,
-  isBatchSupported,
-  isBigInt,
-  isNull,
-  isRequiredNumber,
-  isValidBigIntString,
-  retry,
-  toJsonTree
-} from '@/functions'
+import { calculateMinAmountWithSlippage, isBatchSupported, isNull, retry } from '@/functions'
+import { TokenSwapper } from '@/tokenSwapper'
 import {
   BondingCurveTokenCreatedEventArgsSchema,
   BuyFrontendParams,
   DexMetadata,
   EstimateLaunchBuyParams,
   EstimateSwapParams,
-  EstimateSwapResult,
   EstimateTradeParams,
   EthAddress,
   EthAddressSchema,
   GenerateSaltParams,
   GenerateSaltResultSchema,
-  GetTokenPoolResponse,
   HexString,
   HydratedCoin,
-  HydratedCoinSchema,
   isBuyFrontendParams,
   isSellFrontendParams,
   LaunchCoinParams,
@@ -68,9 +51,9 @@ import {
   NewCoin,
   PredictTokenParams,
   SellFrontendParams,
+  SwapEstimation,
   SwapParams,
   TokenCreatedEventArgsSchema,
-  TokenPoolType,
   TradeBuyParams,
   TradeSellParams
 } from '@/types'
@@ -101,6 +84,8 @@ export class MemecoinSDK {
   private readonly config: MemecoinSDKConfig
   private readonly rpcUrl: string
   private readonly apiBaseUrl: string
+  private readonly tokenSwapper: TokenSwapper
+  private readonly api: MemecoinAPI
 
   private get walletClient(): WalletClient {
     if ('walletClient' in this.config && this.config.walletClient) {
@@ -133,6 +118,7 @@ export class MemecoinSDK {
     this.config = config
     this.rpcUrl = config.rpcUrl
     this.apiBaseUrl = config.apiBaseUrl ?? API_BASE_URL
+    this.api = new MemecoinAPI(this.apiBaseUrl)
     this.baseChain = {
       ...base,
       rpcUrls: {
@@ -146,6 +132,8 @@ export class MemecoinSDK {
       chain: this.baseChain,
       transport: http(this.rpcUrl)
     }) as PublicClient
+
+    this.tokenSwapper = new TokenSwapper(this.publicClient, this.walletClient, this.api)
   }
 
   private async switchToBaseChain(): Promise<void> {
@@ -171,55 +159,15 @@ export class MemecoinSDK {
   }
 
   async getCoin(id: EthAddress | number): Promise<HydratedCoin | undefined> {
-    if (isRequiredNumber(id)) {
-      const response = await fetch(`${this.apiBaseUrl}/api/coins/get-by-id`, {
-        method: 'POST',
-        body: JSON.stringify({ coinId: id }),
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (response.status === 404) {
-        return undefined
-      }
-
-      const data = HydratedCoinSchema.parse(await response.json())
-      return data
-    }
-
-    const response = await fetch(`${this.apiBaseUrl}/api/coins/${id}`)
-    const data = HydratedCoinSchema.parse(await response.json())
-    return data
+    return this.api.getCoin(id)
   }
 
   async getTrending(): Promise<HydratedCoin[]> {
-    const response = await fetch(`${this.apiBaseUrl}/api/coins/trending-coins`)
-    const data = HydratedCoinSchema.array().parse(await response.json())
-    return data
+    return this.api.getTrending()
   }
 
   async estimateBuy(params: EstimateTradeParams): Promise<bigint> {
-    const { coin, amountIn } = params
-
-    const response = await fetch(`${this.apiBaseUrl}/api/coins/get-amount-out-tokens`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        memeTokenAddress: coin,
-        amountIn: amountIn.toString()
-      })
-    })
-
-    const result = await response.json()
-
-    if (!isValidBigIntString(result)) {
-      throw new Error('Invalid response format')
-    }
-
-    return BigInt(result)
+    return this.api.estimateBuy(params.coin, params.amountIn)
   }
 
   async buy(params: TradeBuyParams): Promise<HexString> {
@@ -297,7 +245,7 @@ export class MemecoinSDK {
       throw new Error('Pair is required for uniswap trade')
     }
 
-    const amountOutMin = this.calculateMinAmountWithSlippage(amountOut, slippage)
+    const amountOutMin = calculateMinAmountWithSlippage(amountOut, slippage)
 
     const fee = (ethAmount * 17n) / 1000n // 1.7% fee
 
@@ -366,7 +314,7 @@ export class MemecoinSDK {
 
     const { coin, amountIn, amountOut, affiliate, slippage, lockingDays } = params
 
-    const minTokens = this.calculateMinAmountWithSlippage(amountOut, slippage)
+    const minTokens = calculateMinAmountWithSlippage(amountOut, slippage)
 
     const account = walletClient.account
     if (isNull(account)) {
@@ -459,90 +407,11 @@ export class MemecoinSDK {
   }
 
   async estimateSell(params: EstimateTradeParams): Promise<bigint> {
-    const { coin, amountIn } = params
-
-    const response = await fetch(`${this.apiBaseUrl}/api/coins/get-amount-out-eth`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        memeTokenAddress: coin,
-        amountIn: amountIn.toString()
-      })
-    })
-
-    const result = await response.json()
-
-    if (!isValidBigIntString(result)) {
-      throw new Error('Invalid response format')
-    }
-
-    return BigInt(result)
+    return this.api.estimateSell(params.coin, params.amountIn)
   }
 
-  async estimateSwap(params: EstimateSwapParams): Promise<EstimateSwapResult> {
-    const [tokenInMemecoin, tokenOutMemecoin] = await Promise.all([
-      this.getCoin(params.tokenIn),
-      this.getCoin(params.tokenOut)
-    ])
-
-    const tokenInData = tokenInMemecoin
-      ? this.determinePoolOfMemecoin(tokenInMemecoin)
-      : await this.findTokenWETHPool(params.tokenIn)
-    const tokenOutData = tokenOutMemecoin
-      ? this.determinePoolOfMemecoin(tokenOutMemecoin)
-      : await this.findTokenWETHPool(params.tokenOut)
-
-    const tokenInPoolType = tokenInData.poolType
-    const feeIn = tokenInData.poolFee
-    const tokenOutPoolType = tokenOutData.poolType
-    const feeOut = tokenOutData.poolFee
-
-    const walletClient = this.walletClient
-    const account = walletClient.account
-    if (isNull(account)) {
-      throw new Error('No account found')
-    }
-
-    if (isNull(tokenInPoolType) || isNull(tokenOutPoolType)) {
-      throw new Error('No pool type found')
-    }
-
-    const { result } = await this.publicClient.simulateContract({
-      account: walletClient.account,
-      address: BONDING_SWAP_CONTRACT,
-      abi: SWAP_ABI,
-      functionName: 'swap',
-      args: [
-        {
-          tokenIn: params.tokenIn,
-          tokenOut: params.tokenOut,
-          tokenInPoolType,
-          tokenOutPoolType,
-          recipient: params.recipient ?? walletClient.account,
-          feeIn,
-          feeOut,
-          orderReferrer: params.orderReferrer ?? MULTISIG_FEE_COLLECTOR
-        }
-      ]
-    })
-
-    if (!isBigInt(result)) {
-      throw new Error('Invalid response format')
-    }
-
-    return {
-      amountOut: result,
-      swapParams: {
-        ...params,
-        feeIn,
-        feeOut,
-        tokenInPoolType,
-        tokenOutPoolType,
-        amountOutMinimum: this.calculateMinAmountWithSlippage(result)
-      }
-    }
+  async estimateSwap(params: EstimateSwapParams): Promise<SwapEstimation> {
+    return this.tokenSwapper.estimateSwap(params)
   }
 
   async sell(params: TradeSellParams): Promise<HexString> {
@@ -635,7 +504,7 @@ export class MemecoinSDK {
       throw new Error('Pair is required for uniswap trade')
     }
 
-    const amountOutMin = this.calculateMinAmountWithSlippage(amountOut, slippage)
+    const amountOutMin = calculateMinAmountWithSlippage(amountOut, slippage)
     const deadline = Math.floor(Date.now() / 1000) + 60 * 20
 
     const spender = this.getUniswapContract(coin)
@@ -814,7 +683,7 @@ export class MemecoinSDK {
 
     const walletClient = this.walletClient
 
-    const minETHAmount = this.calculateMinAmountWithSlippage(amountOut, slippage)
+    const minETHAmount = calculateMinAmountWithSlippage(amountOut, slippage)
 
     let poolContractAddress: EthAddress
     switch (coin.dexKind) {
@@ -972,150 +841,7 @@ export class MemecoinSDK {
       await this.switchToBaseChain()
     }
 
-    const walletClient = this.walletClient
-
-    const {
-      amountOutMinimum,
-      tokenIn,
-      amountIn,
-      orderReferrer,
-      recipient,
-      feeIn,
-      feeOut,
-      tokenInPoolType,
-      tokenOutPoolType,
-      tokenOut
-    } = params
-
-    const amountOutMin = this.calculateMinAmountWithSlippage(amountOutMinimum)
-
-    const approveContractCall = {
-      address: tokenIn,
-      abi: [
-        {
-          inputs: [
-            { name: 'spender', type: 'address' },
-            { name: 'amount', type: 'uint256' }
-          ],
-          name: 'approve',
-          outputs: [{ name: '', type: 'bool' }],
-          stateMutability: 'nonpayable',
-          type: 'function'
-        }
-      ],
-      functionName: 'approve',
-      args: [BONDING_SWAP_CONTRACT, amountIn]
-    } as const
-
-    const swapContractCall = {
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-      abi: SWAP_ABI as Abi,
-      address: BONDING_SWAP_CONTRACT,
-      functionName: 'swap',
-      args: [
-        {
-          tokenIn,
-          tokenOut,
-          tokenInPoolType,
-          tokenOutPoolType,
-          recipient: recipient ?? walletClient.account,
-          amountIn,
-          amountOutMin,
-          orderReferrer: orderReferrer ?? MULTISIG_FEE_COLLECTOR,
-          feeIn: feeIn ?? 0,
-          feeOut: feeOut ?? 0
-        }
-      ]
-    } as const
-
-    const account = walletClient.account
-    if (isNull(account)) {
-      throw new Error('No account found')
-    }
-
-    if (await this.isBatchSupported()) {
-      const result = await writeContracts(walletClient, {
-        contracts: [
-          // approve
-          ...(tokenInPoolType !== TokenPoolType.WETH ? [approveContractCall] : []),
-          // swap
-          swapContractCall
-        ],
-        account,
-        chain: base
-      })
-
-      let status, receipts
-      const extendedWalletClient = walletClient.extend(eip5792Actions())
-      do {
-        ;({ status, receipts } = await extendedWalletClient.getCallsStatus({
-          id: result
-        }))
-        if (status !== 'CONFIRMED') {
-          await new Promise((resolve) => setTimeout(resolve, 1000))
-        }
-      } while (status !== 'CONFIRMED')
-
-      if (isNull(receipts) || receipts.length === 0) {
-        throw new Error('Transaction failed')
-      }
-
-      const lastReceipt = receipts[receipts.length - 1]
-      if (isNull(lastReceipt)) {
-        throw new Error('Transaction failed')
-      }
-
-      if (isNull(lastReceipt.transactionHash)) {
-        throw new Error('Transaction reverted')
-      }
-
-      return lastReceipt.transactionHash
-    } else {
-      if (tokenInPoolType !== TokenPoolType.WETH) {
-        const data = encodeFunctionData(approveContractCall)
-        const txParams = {
-          to: tokenIn,
-          data,
-          account,
-          chain: base
-        }
-
-        const gas = ((await this.publicClient.estimateGas(txParams)) * 125n) / 100n
-
-        const approveTx = await walletClient.sendTransaction({
-          ...txParams,
-          gas
-        })
-
-        await this.publicClient.waitForTransactionReceipt({
-          hash: approveTx,
-          confirmations: 2
-        })
-      }
-
-      const data = encodeFunctionData(swapContractCall)
-
-      const txParams = {
-        to: BONDING_SWAP_CONTRACT,
-        data,
-        account,
-        chain: base
-      }
-
-      const gas = ((await this.publicClient.estimateGas(txParams)) * 125n) / 100n
-
-      const tx = await walletClient.sendTransaction({
-        ...txParams,
-        gas
-      })
-
-      const receipt = await this.publicClient.waitForTransactionReceipt({
-        hash: tx,
-        confirmations: 3
-      })
-
-      return receipt.transactionHash
-    }
+    return this.tokenSwapper.swap(params, isBatchSupported)
   }
 
   async launch(launchParams: LaunchCoinParams): Promise<LaunchCoinResponse> {
@@ -1271,92 +997,7 @@ export class MemecoinSDK {
   }
 
   private async launchCoin(coin: NewCoin, txHash: HexString): Promise<void> {
-    const tree = toJsonTree({
-      coin,
-      txHash
-    })
-
-    const response = await fetch(`${this.apiBaseUrl}/api/coins/new`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(tree)
-    })
-
-    if (!response.ok) {
-      throw new Error('Failed to launch coin')
-    }
-  }
-
-  private calculateMinAmountWithSlippage(amount: bigint, slippagePercentage: number = 5): bigint {
-    const bnAmount = new BigNumber(amount.toString())
-    const bnSlippage = new BigNumber(100 - slippagePercentage).dividedBy(100)
-    const result = bnAmount.multipliedBy(bnSlippage)
-    return BigInt(result.toFixed(0))
-  }
-
-  private determinePoolOfMemecoin(memecoin: HydratedCoin): GetTokenPoolResponse {
-    if (!memecoin.dexInitiated) {
-      return { poolType: TokenPoolType.BondingCurve, poolFee: 0 }
-    }
-
-    switch (memecoin.dexKind) {
-      case 'univ2':
-        return { poolType: TokenPoolType.UniswapV2, poolFee: 0 }
-      case 'univ3':
-      case 'univ3-bonding':
-        return { poolType: TokenPoolType.UniswapV3, poolFee: 10000 }
-    }
-  }
-
-  async findTokenWETHPool(token: EthAddress): Promise<GetTokenPoolResponse> {
-    const feeTiers = [500, 3000, 10000]
-
-    const poolPromises = feeTiers.map(async (fee) => {
-      const v3Response = await this.publicClient.readContract({
-        address: UNISWAP_V3_FACTORY,
-        abi: UNISWAP_V3_FACTORY_ABI,
-        functionName: 'getPool',
-        args: [token, WETH_TOKEN, fee]
-      })
-
-      if (v3Response !== ZERO_ADDRESS) {
-        const liquidity = await this.getPoolLiquidityAtCurrentTick(v3Response)
-        return { poolType: TokenPoolType.UniswapV3, poolFee: fee, liquidity }
-      }
-      return undefined
-    })
-
-    const poolResults = await Promise.all(poolPromises)
-    const validPools = compactMap(poolResults)
-
-    if (validPools.length === 0) {
-      const v2Response = await this.publicClient.readContract({
-        address: UNISWAP_V2_FACTORY,
-        abi: UNISWAP_V2_FACTORY_ABI,
-        functionName: 'getPair',
-        args: [token, WETH_TOKEN]
-      })
-
-      if (v2Response !== ZERO_ADDRESS) {
-        return {
-          poolType: TokenPoolType.UniswapV2,
-          poolFee: 0
-        }
-      } else {
-        throw new Error('No pool found')
-      }
-    }
-
-    const deepestPool = validPools.reduce((max, pool) =>
-      pool.liquidity > max.liquidity ? pool : max
-    )
-
-    return {
-      poolType: deepestPool.poolType,
-      poolFee: deepestPool.poolFee
-    }
+    return this.api.launchCoin(coin, txHash)
   }
 
   async getERC20Allowance(
@@ -1364,21 +1005,7 @@ export class MemecoinSDK {
     spenderAddress: EthAddress,
     accountAddress: EthAddress
   ): Promise<bigint> {
-    const response = await fetch(`${this.apiBaseUrl}/api/coins/get-erc20-allowance`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ tokenAddress, spenderAddress, accountAddress })
-    })
-
-    const result = await response.json()
-
-    if (!isValidBigIntString(result)) {
-      throw new Error('Invalid response format')
-    }
-
-    return BigInt(result)
+    return this.api.getERC20Allowance(tokenAddress, spenderAddress, accountAddress)
   }
 
   async calculateDirectLaunchTick(params: MarketCapToTickParams): Promise<number> {
@@ -1484,49 +1111,5 @@ export class MemecoinSDK {
       case 'univ3-bonding':
         return UNISWAP_V3_ROUTER
     }
-  }
-
-  private async getPoolLiquidityAtCurrentTick(poolAddress: EthAddress): Promise<bigint> {
-    const [, tick] = await this.publicClient.readContract({
-      address: poolAddress,
-      abi: [
-        {
-          constant: true,
-          inputs: [],
-          name: 'slot0',
-          outputs: [
-            { name: 'sqrtPriceX96', type: 'uint160' },
-            { name: 'tick', type: 'int24' }
-          ],
-          payable: false,
-          stateMutability: 'view',
-          type: 'function'
-        }
-      ],
-      functionName: 'slot0',
-      args: []
-    })
-
-    const [liquidity] = await this.publicClient.readContract({
-      address: poolAddress,
-      abi: [
-        {
-          constant: true,
-          inputs: [{ name: 'tick', type: 'int24' }],
-          name: 'ticks',
-          outputs: [
-            { name: 'liquidityGross', type: 'uint128' },
-            { name: 'liquidityNet', type: 'int128' }
-          ],
-          payable: false,
-          stateMutability: 'view',
-          type: 'function'
-        }
-      ],
-      functionName: 'ticks',
-      args: [tick]
-    })
-
-    return liquidity
   }
 }
