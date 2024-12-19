@@ -12,17 +12,14 @@ import {
   SwapParams,
   TokenPoolType
 } from '@/types'
-import { UniswapV2 } from '@/uniswapv2'
-import { UniswapV3 } from '@/uniswapv3'
+import { UniswapV2 } from '@/uniswap/v2'
+import { UniswapV3 } from '@/uniswap/v3'
 import LRUCache from 'lru-cache'
 import { Abi, encodeFunctionData, PublicClient, WalletClient } from 'viem'
 import { base } from 'viem/chains'
 import { eip5792Actions, writeContracts } from 'viem/experimental'
 
 export class TokenSwapper {
-  private readonly uniswapV3: UniswapV3
-  private readonly uniswapV2: UniswapV2
-
   private poolCache = new LRUCache<EthAddress, Promise<ResolveTokenPoolResponse>>({
     max: 100,
     maxAge: 1000 * 60 * 5 // 5 mins
@@ -31,11 +28,10 @@ export class TokenSwapper {
   constructor(
     private readonly publicClient: PublicClient,
     private readonly walletClient: WalletClient,
+    private readonly uniswapV3: UniswapV3,
+    private readonly uniswapV2: UniswapV2,
     private readonly api: MemecoinAPI
-  ) {
-    this.uniswapV3 = new UniswapV3(this.publicClient)
-    this.uniswapV2 = new UniswapV2(this.publicClient)
-  }
+  ) {}
 
   async estimateSwap(params: EstimateSwapParams): Promise<SwapEstimation> {
     const { tokenIn, tokenOut, amountIn, address, recipient, orderReferrer } = params

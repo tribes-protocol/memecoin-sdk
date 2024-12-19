@@ -18,7 +18,6 @@ import {
   SwapEstimation,
   SwapParams
 } from '@/types'
-import { getUniswapPair } from '@/uniswap'
 import { Pair } from '@uniswap/v2-sdk'
 import { createContext, ReactNode, useContext } from 'react'
 import { useWalletClient } from 'wagmi'
@@ -84,7 +83,7 @@ export const MemecoinProvider = ({
     sell: sdk.sell.bind(sdk),
     swap: sdk.swap.bind(sdk),
     launchCoin: sdk.launch.bind(sdk),
-    getPair: (coin: EthAddress) => getUniswapPair(coin, sdk.publicClient),
+    getPair: sdk.getUniswapPair.bind(sdk),
     getERC20Allowance: sdk.getERC20Allowance.bind(sdk),
     generateDirectLaunchSalt: sdk.generateDirectLaunchSalt.bind(sdk),
     predictDirectLaunchToken: sdk.predictDirectLaunchToken.bind(sdk),

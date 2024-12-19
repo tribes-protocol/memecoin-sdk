@@ -31,7 +31,6 @@
   },
   "dependencies": {
     "@uniswap/sdk-core": "^5.9.0",
-    "@uniswap/smart-order-router": "^4.8.3",
     "@uniswap/v2-sdk": "^4.6.2",
     "bignumber.js": "^9.1.2",
     "zod": "^3.23.8"

@@ -57,8 +57,10 @@ import {
   TradeBuyParams,
   TradeSellParams
 } from '@/types'
-import { fetchEthereumPrice, getUniswapPair, getUniswapV3TickSpacing } from '@/uniswap'
+import { UniswapV2 } from '@/uniswap/v2'
+import { UniswapV3 } from '@/uniswap/v3'
 import { ChainId, Token, WETH9 } from '@uniswap/sdk-core'
+import { Pair } from '@uniswap/v2-sdk'
 import BigNumber from 'bignumber.js'
 import {
   Abi,
@@ -86,6 +88,8 @@ export class MemecoinSDK {
   private readonly apiBaseUrl: string
   private readonly tokenSwapper: TokenSwapper
   private readonly api: MemecoinAPI
+  private readonly uniswapV2: UniswapV2
+  private readonly uniswapV3: UniswapV3
 
   private get walletClient(): WalletClient {
     if ('walletClient' in this.config && this.config.walletClient) {
@@ -133,7 +137,15 @@ export class MemecoinSDK {
       transport: http(this.rpcUrl)
     }) as PublicClient
 
-    this.tokenSwapper = new TokenSwapper(this.publicClient, this.walletClient, this.api)
+    this.uniswapV2 = new UniswapV2(this.publicClient)
+    this.uniswapV3 = new UniswapV3(this.publicClient)
+    this.tokenSwapper = new TokenSwapper(
+      this.publicClient,
+      this.walletClient,
+      this.uniswapV3,
+      this.uniswapV2,
+      this.api
+    )
   }
 
   private async switchToBaseChain(): Promise<void> {
@@ -203,7 +215,7 @@ export class MemecoinSDK {
           amountOut,
           pair:
             coin.dexKind === 'univ2'
-              ? await getUniswapPair(coin.contractAddress, this.publicClient)
+              ? await this.uniswapV2.getPair(coin.contractAddress)
               : undefined
         })
       } else {
@@ -457,7 +469,7 @@ export class MemecoinSDK {
           amountOut,
           pair:
             coin.dexKind === 'univ2'
-              ? await getUniswapPair(coin.contractAddress, this.publicClient)
+              ? await this.uniswapV2.getPair(coin.contractAddress)
               : undefined,
           allowance
         })
@@ -1000,6 +1012,10 @@ export class MemecoinSDK {
     return this.api.launchCoin(coin, txHash)
   }
 
+  async getUniswapPair(coin: EthAddress): Promise<Pair> {
+    return this.uniswapV2.getPair(coin)
+  }
+
   async getERC20Allowance(
     tokenAddress: EthAddress,
     spenderAddress: EthAddress,
@@ -1012,8 +1028,8 @@ export class MemecoinSDK {
     const { marketCap, totalSupply, fee } = params
 
     const [tickSpacing, { price: ethPrice }] = await Promise.all([
-      getUniswapV3TickSpacing(fee, this.publicClient),
-      fetchEthereumPrice(this.publicClient)
+      this.uniswapV3.getUniswapV3TickSpacing(fee),
+      this.uniswapV3.fetchEthereumPrice()
     ])
 
     const totalSupplyNumber = new BigNumber(totalSupply.toString())
