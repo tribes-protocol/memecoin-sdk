@@ -27,7 +27,7 @@ import {
   WETH_TOKEN
 } from '@/constants'
 import { calculateMinAmountWithSlippage, isBatchSupported, isNull, retry } from '@/functions'
-import { TokenSwapper } from '@/tokenSwapper'
+import { TokenSwapper } from '@/swapper'
 import {
   BondingCurveTokenCreatedEventArgsSchema,
   BuyFrontendParams,
@@ -57,8 +57,8 @@ import {
   TradeBuyParams,
   TradeSellParams
 } from '@/types'
-import { UniswapV2 } from '@/uniswap/v2'
-import { UniswapV3 } from '@/uniswap/v3'
+import { UniswapV2 } from '@/uniswapv2'
+import { UniswapV3 } from '@/uniswapv3'
 import { ChainId, Token, WETH9 } from '@uniswap/sdk-core'
 import { Pair } from '@uniswap/v2-sdk'
 import BigNumber from 'bignumber.js'

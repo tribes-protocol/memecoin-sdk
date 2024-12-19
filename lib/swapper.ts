@@ -1,6 +1,11 @@
 import { SWAP_ABI } from '@/abi'
 import { MemecoinAPI } from '@/api'
-import { MULTISIG_FEE_COLLECTOR, SWAPPER_CONTRACT, WETH_ADDRESS } from '@/constants'
+import {
+  MULTISIG_FEE_COLLECTOR,
+  SWAPPER_CONTRACT,
+  UNISWAP_FEE_TIERS,
+  WETH_ADDRESS
+} from '@/constants'
 import { calculateMinAmountWithSlippage, isBigInt, isNull } from '@/functions'
 import {
   EstimateSwapParams,
@@ -12,8 +17,8 @@ import {
   SwapParams,
   TokenPoolType
 } from '@/types'
-import { UniswapV2 } from '@/uniswap/v2'
-import { UniswapV3 } from '@/uniswap/v3'
+import { UniswapV2 } from '@/uniswapv2'
+import { UniswapV3 } from '@/uniswapv3'
 import { LRUCache } from 'lru-cache'
 import { Abi, encodeFunctionData, PublicClient, WalletClient } from 'viem'
 import { base } from 'viem/chains'
@@ -21,7 +26,7 @@ import { eip5792Actions, writeContracts } from 'viem/experimental'
 
 export class TokenSwapper {
   private poolCache = new LRUCache<EthAddress, Promise<ResolveTokenPoolResponse>>({
-    max: 100,
+    max: 10000,
     ttl: 1000 * 60 * 5 // 5 mins
   })
 
@@ -33,27 +38,44 @@ export class TokenSwapper {
     private readonly api: MemecoinAPI
   ) {}
 
+  private async getPool(contractAddress: EthAddress): Promise<ResolveTokenPoolResponse> {
+    const cachedPool = this.poolCache.get(contractAddress)
+    if (cachedPool) {
+      return cachedPool
+    }
+
+    const promise = (async () => {
+      if (contractAddress === WETH_ADDRESS) {
+        return { poolType: TokenPoolType.WETH, poolFee: 0 }
+      }
+
+      const coin = await this.api.getCoin(contractAddress)
+
+      if (coin) {
+        return this.resolvePoolOfMemecoin(coin)
+      }
+
+      return this.resolveTokenWETHPool(contractAddress)
+    })()
+
+    this.poolCache.set(contractAddress, promise)
+
+    try {
+      return await promise
+    } catch (error) {
+      this.poolCache.delete(contractAddress)
+      throw error
+    }
+  }
+
   async estimateSwap(params: EstimateSwapParams): Promise<SwapEstimation> {
     const { tokenIn, tokenOut, amountIn, address, recipient, orderReferrer, slippage } = params
 
     const allowance = await this.api.getERC20Allowance(tokenIn, SWAPPER_CONTRACT, address)
 
-    const [tokenInMemecoin, tokenOutMemecoin] = await Promise.all([
-      this.api.getCoin(tokenIn),
-      this.api.getCoin(tokenOut)
-    ])
-
     const [tokenInData, tokenOutData] = await Promise.all([
-      tokenInMemecoin
-        ? this.resolvePoolOfMemecoin(tokenInMemecoin)
-        : tokenIn === WETH_ADDRESS
-          ? { poolType: TokenPoolType.WETH, poolFee: 0 }
-          : this.resolveTokenWETHPool(tokenIn),
-      tokenOutMemecoin
-        ? this.resolvePoolOfMemecoin(tokenOutMemecoin)
-        : tokenOut === WETH_ADDRESS
-          ? { poolType: TokenPoolType.WETH, poolFee: 0 }
-          : this.resolveTokenWETHPool(tokenOut)
+      this.getPool(tokenIn),
+      this.getPool(tokenOut)
     ])
 
     const tokenInPoolType = tokenInData.poolType
@@ -269,36 +291,25 @@ export class TokenSwapper {
   }
 
   private async resolveTokenWETHPool(token: EthAddress): Promise<ResolveTokenPoolResponse> {
-    const cachedPool = this.poolCache.get(token)
-    if (cachedPool) {
-      return cachedPool
+    const v3PoolPromises = UNISWAP_FEE_TIERS.map((fee) =>
+      this.uniswapV3.getWETHPoolLiquidity(token, fee)
+    )
+
+    const v2Promise = this.uniswapV2.getWETHPoolLiquidity(token)
+
+    const poolResults = await Promise.all([...v3PoolPromises, v2Promise])
+
+    const deepestPool = poolResults.reduce((max, pool) =>
+      pool.liquidity > max.liquidity ? pool : max
+    )
+
+    if (deepestPool.liquidity === 0n) {
+      throw new Error('No pool found')
     }
 
-    const poolPromise = (async () => {
-      const feeTiers = [500, 3000, 10000]
-
-      const v3PoolPromises = feeTiers.map((fee) => this.uniswapV3.getWETHPoolLiquidity(token, fee))
-
-      const v2Promise = this.uniswapV2.getWETHPoolLiquidity(token)
-
-      const poolResults = await Promise.all([...v3PoolPromises, v2Promise])
-
-      const deepestPool = poolResults.reduce((max, pool) =>
-        pool.liquidity > max.liquidity ? pool : max
-      )
-
-      if (deepestPool.liquidity === 0n) {
-        throw new Error('No pool found')
-      }
-
-      return {
-        poolType: deepestPool.poolType,
-        poolFee: deepestPool.poolFee
-      }
-    })()
-
-    this.poolCache.set(token, poolPromise)
-
-    return poolPromise
+    return {
+      poolType: deepestPool.poolType,
+      poolFee: deepestPool.poolFee
+    }
   }
 }

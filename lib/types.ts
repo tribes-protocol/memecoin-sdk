@@ -294,6 +294,7 @@ export interface EstimateSwapParams {
   recipient?: EthAddress
   orderReferrer?: EthAddress
   slippage?: number
+  skipCache?: boolean
 }
 
 export interface SwapParams {
