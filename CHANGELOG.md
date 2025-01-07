@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.31
+
+### Patch Changes
+
+- be29990: remove dep on walletclient in constructor
+
 ## 0.0.30
 
 ### Patch Changes
