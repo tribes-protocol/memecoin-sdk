@@ -12,6 +12,7 @@ import {
   EthAddress,
   HexString,
   HydratedCoin,
+  MemecoinSDKConfig,
   ResolveTokenPoolResponse,
   SwapEstimation,
   SwapParams,
@@ -19,6 +20,7 @@ import {
 } from '@/types'
 import { UniswapV2 } from '@/uniswapv2'
 import { UniswapV3 } from '@/uniswapv3'
+import { getWalletClient } from '@/walletclient'
 import { LRUCache } from 'lru-cache'
 import { Abi, encodeFunctionData, PublicClient, WalletClient } from 'viem'
 import { base } from 'viem/chains'
@@ -32,11 +34,15 @@ export class TokenSwapper {
 
   constructor(
     private readonly publicClient: PublicClient,
-    private readonly walletClient: WalletClient,
+    private readonly config: MemecoinSDKConfig,
     private readonly uniswapV3: UniswapV3,
     private readonly uniswapV2: UniswapV2,
     private readonly api: MemecoinAPI
   ) {}
+
+  private get walletClient(): WalletClient {
+    return getWalletClient(this.config)
+  }
 
   private async getPool(contractAddress: EthAddress): Promise<ResolveTokenPoolResponse> {
     const cachedPool = this.poolCache.get(contractAddress)
