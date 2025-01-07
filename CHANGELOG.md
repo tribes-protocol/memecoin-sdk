@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.32
+
+### Patch Changes
+
+- f9f3d23: handle skip cache flag in estimateSwap
+
 ## 0.0.31
 
 ### Patch Changes
