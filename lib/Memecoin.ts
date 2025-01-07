@@ -59,6 +59,7 @@ import {
 } from '@/types'
 import { UniswapV2 } from '@/uniswapv2'
 import { UniswapV3 } from '@/uniswapv3'
+import { getWalletClient } from '@/walletclient'
 import { ChainId, Token, WETH9 } from '@uniswap/sdk-core'
 import { Pair } from '@uniswap/v2-sdk'
 import BigNumber from 'bignumber.js'
@@ -67,7 +68,6 @@ import {
   Account,
   Chain,
   createPublicClient,
-  createWalletClient,
   decodeEventLog,
   encodeFunctionData,
   erc20Abi,
@@ -78,7 +78,6 @@ import {
   WalletCapabilitiesRecord,
   WalletClient
 } from 'viem'
-import { privateKeyToAccount } from 'viem/accounts'
 import { base } from 'viem/chains'
 import { eip5792Actions, getCapabilities, writeContracts } from 'viem/experimental'
 
@@ -86,23 +85,13 @@ export class MemecoinSDK {
   private readonly config: MemecoinSDKConfig
   private readonly rpcUrl: string
   private readonly apiBaseUrl: string
-  private readonly tokenSwapper: TokenSwapper
   private readonly api: MemecoinAPI
   private readonly uniswapV2: UniswapV2
   private readonly uniswapV3: UniswapV3
+  private readonly tokenSwapper: TokenSwapper
 
   private get walletClient(): WalletClient {
-    if ('walletClient' in this.config && this.config.walletClient) {
-      return this.config.walletClient
-    } else if ('privateKey' in this.config && this.config.privateKey) {
-      return createWalletClient({
-        account: privateKeyToAccount(this.config.privateKey),
-        chain: base,
-        transport: http(this.rpcUrl)
-      })
-    } else {
-      throw new Error('Wallet client is required for write operations')
-    }
+    return getWalletClient(this.config)
   }
 
   private get capabilities(): Promise<WalletCapabilitiesRecord<WalletCapabilities, number>> {
@@ -131,6 +120,7 @@ export class MemecoinSDK {
         }
       }
     }
+
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     this.publicClient = createPublicClient({
       chain: this.baseChain,
@@ -139,9 +129,10 @@ export class MemecoinSDK {
 
     this.uniswapV2 = new UniswapV2(this.publicClient)
     this.uniswapV3 = new UniswapV3(this.publicClient)
+
     this.tokenSwapper = new TokenSwapper(
       this.publicClient,
-      this.walletClient,
+      this.config,
       this.uniswapV3,
       this.uniswapV2,
       this.api
