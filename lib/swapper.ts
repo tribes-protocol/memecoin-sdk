@@ -77,6 +77,11 @@ export class TokenSwapper {
   async estimateSwap(params: EstimateSwapParams): Promise<SwapEstimation> {
     const { tokenIn, tokenOut, amountIn, address, recipient, orderReferrer, slippage } = params
 
+    if (params.skipCache) {
+      this.poolCache.delete(tokenIn)
+      this.poolCache.delete(tokenOut)
+    }
+
     const [tokenInData, tokenOutData, allowance] = await Promise.all([
       this.getPool(tokenIn),
       this.getPool(tokenOut),
