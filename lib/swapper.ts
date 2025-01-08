@@ -175,25 +175,25 @@ export class TokenSwapper {
       args: [SWAPPER_CONTRACT, amountIn]
     } as const
 
+    const args = {
+      tokenIn,
+      tokenOut,
+      tokenInPoolType,
+      tokenOutPoolType,
+      recipient: recipient ?? walletClient.account?.address,
+      amountIn,
+      amountOutMinimum: amountOutMin,
+      orderReferrer: orderReferrer ?? MULTISIG_FEE_COLLECTOR,
+      feeIn: feeIn ?? 0,
+      feeOut: feeOut ?? 0
+    }
+
     const swapContractCall = {
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       abi: SWAP_ABI as Abi,
       address: SWAPPER_CONTRACT,
       functionName: 'swap',
-      args: [
-        {
-          tokenIn,
-          tokenOut,
-          tokenInPoolType,
-          tokenOutPoolType,
-          recipient: recipient ?? walletClient.account,
-          amountIn,
-          amountOutMinimum: amountOutMin,
-          orderReferrer: orderReferrer ?? MULTISIG_FEE_COLLECTOR,
-          feeIn: feeIn ?? 0,
-          feeOut: feeOut ?? 0
-        }
-      ]
+      args: [args]
     } as const
 
     const account = walletClient.account
@@ -269,7 +269,8 @@ export class TokenSwapper {
         to: SWAPPER_CONTRACT,
         data,
         account,
-        chain: base
+        chain: base,
+        value: tokenInPoolType === TokenPoolType.WETH ? amountIn : 0n
       }
 
       const gas = ((await this.publicClient.estimateGas(txParams)) * 125n) / 100n
