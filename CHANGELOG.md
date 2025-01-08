@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.36
+
+### Patch Changes
+
+- 8a6d469: fix pool fee
+
 ## 0.0.35
 
 ### Patch Changes
