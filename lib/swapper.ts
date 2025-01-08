@@ -51,11 +51,13 @@ export class TokenSwapper {
     }
 
     const promise = (async () => {
-      if (contractAddress === WETH_ADDRESS) {
-        return { poolType: TokenPoolType.WETH, poolFee: 0 }
-      }
-
       const coin = await this.api.getCoin(contractAddress)
+
+      if (contractAddress === WETH_ADDRESS) {
+        return coin?.dexKind === 'memecoinv5'
+          ? { poolType: TokenPoolType.MEME, poolFee: 10000 }
+          : { poolType: TokenPoolType.WETH, poolFee: 0 }
+      }
 
       if (coin) {
         return this.resolvePoolOfMemecoin(coin)
@@ -288,7 +290,13 @@ export class TokenSwapper {
 
   private resolvePoolOfMemecoin(memecoin: HydratedCoin): ResolveTokenPoolResponse {
     if (!memecoin.dexInitiated) {
-      return { poolType: TokenPoolType.BondingCurve, poolFee: 0 }
+      return {
+        poolType:
+          memecoin.dexKind === 'memecoinv5'
+            ? TokenPoolType.BondingCurveV2
+            : TokenPoolType.BondingCurveV1,
+        poolFee: 0
+      }
     }
 
     switch (memecoin.dexKind) {
@@ -296,6 +304,7 @@ export class TokenSwapper {
         return { poolType: TokenPoolType.UniswapV2, poolFee: 0 }
       case 'univ3':
       case 'univ3-bonding':
+      case 'memecoinv5':
         return { poolType: TokenPoolType.UniswapV3, poolFee: 10000 }
     }
   }

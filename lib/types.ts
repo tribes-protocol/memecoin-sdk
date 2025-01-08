@@ -34,7 +34,10 @@ export type MemecoinSDKConfig =
       privateKey?: HexString
     })
 
-export interface BaseLaunchCoinParams {
+export interface BaseLaunchCoinParams {}
+
+export interface LaunchCoinParams extends BaseLaunchCoinParams {
+  marketCap: number // market cap in USD, 0 for direct launch
   name: string
   ticker: string
   antiSnipeAmount: bigint
@@ -45,33 +48,20 @@ export interface BaseLaunchCoinParams {
   farcaster?: string
   telegram?: string
   discord?: string
-  lockingDays?: number
   farcasterId?: number
 }
 
-export type LaunchCoinBondingCurveParams = BaseLaunchCoinParams & {
-  kind: 'bonding-curve'
-}
-
-export type LaunchCoinDirectParams = BaseLaunchCoinParams & {
-  kind: 'direct'
-  tick: number
-  salt: HexString
-  fee: number
-}
-
-export type EstimateLaunchBuyParams = Omit<LaunchCoinDirectParams, 'description' | 'image'> & {
+export type EstimateLaunchBuyParams = Omit<LaunchCoinParams, 'description' | 'image'> & {
   account: EthAddress
 }
 
-export type LaunchCoinParams = LaunchCoinBondingCurveParams | LaunchCoinDirectParams
-
-export const DexMetadataUniv3Schema = z.object({
-  lpNftId: z.string(),
-  lockerAddress: EthAddressSchema
+export const DexMetadataSchema = z.object({
+  marketAddress: EthAddressSchema.optional(),
+  wethNFTId: z.bigint().optional(),
+  memeNFTId: z.bigint().optional()
 })
 
-export type DexMetadata = z.infer<typeof DexMetadataUniv3Schema>
+export type DexMetadata = z.infer<typeof DexMetadataSchema>
 
 export interface LaunchCoinResponse {
   contractAddress: EthAddress
@@ -147,7 +137,8 @@ export const CoinSchema = z.object({
   tgImageId: z.string().nullable().optional(),
   tgVideoId: z.string().nullable().optional(),
   farcasterId: z.number().nullable().optional(),
-  dexKind: z.enum(['univ2', 'univ3', 'univ3-bonding']),
+  dexKind: z.enum(['univ2', 'univ3', 'univ3-bonding', 'memecoinv5']),
+  marketAddress: EthAddressSchema.nullable().optional(),
   dexMetadata: z.string().nullable().optional()
 })
 
@@ -280,10 +271,12 @@ export interface EstimateTradeParams {
 }
 
 export enum TokenPoolType {
-  BondingCurve = 0,
-  UniswapV3 = 1,
-  UniswapV2 = 2,
-  WETH = 3
+  BondingCurveV1 = 0,
+  BondingCurveV2 = 1,
+  UniswapV3 = 2,
+  UniswapV2 = 3,
+  WETH = 4,
+  MEME = 5
 }
 
 export interface EstimateSwapParams {
@@ -316,15 +309,16 @@ export const GenerateSaltResultSchema = z.object({
   token: EthAddressSchema
 })
 
-export type GenerateSaltParams = {
+export interface PredictTokenParams {
   name: string
   symbol: string
-  supply: bigint
   account: EthAddress
+  seed: string
 }
 
-export type PredictTokenParams = GenerateSaltParams & {
+export interface PredictTokenResponse {
   salt: HexString
+  token: EthAddress
 }
 
 export const LaunchResultSchema = z.tuple([EthAddressSchema, z.bigint(), z.bigint()])
@@ -350,3 +344,15 @@ export interface WETHPoolLiquidity {
   poolFee: number
   liquidity: bigint
 }
+
+export const PredictTokenResultSchema = z.tuple([HexStringSchema, EthAddressSchema])
+
+export type PredictTokenResult = z.infer<typeof PredictTokenResultSchema>
+
+export const TokenGraduatedEventArgsSchema = z.object({
+  tokenAddress: EthAddressSchema,
+  memeTokenId: z.bigint(),
+  wethTokenId: z.bigint()
+})
+
+export type TokenGraduatedEventArgs = z.infer<typeof TokenGraduatedEventArgsSchema>
