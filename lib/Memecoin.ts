@@ -195,7 +195,7 @@ export class MemecoinSDK {
       name,
       symbol: ticker,
       account: account.address,
-      seed: '1234567890' // what should this be?
+      seed: Date.now().toString() // what should this be?
     })
 
     const launchData = encodeFunctionData({
@@ -205,7 +205,7 @@ export class MemecoinSDK {
     })
 
     const launchTx = {
-      address: MEMECOIN_V5_LAUNCHER,
+      to: MEMECOIN_V5_LAUNCHER,
       data: launchData,
       value: antiSnipeAmount + parseEther('0.00001'),
       account,

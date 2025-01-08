@@ -139,7 +139,7 @@ export const LN_1_0001 = Math.log(1.0001)
 export const UNISWAP_FEE_TIERS = [500, 3000, 10000]
 
 export const MEMECOIN_V5_LAUNCHER = EthAddressSchema.parse(
-  '0x25a28CC1dC19878932dF67f58e3f4FBe493f33f2'
+  '0xf3E4CAA171543597B7dA0673297a574ef45fEA96'
 )
 
 export const TOKEN_SWAPPER_ADDRESS = EthAddressSchema.parse(

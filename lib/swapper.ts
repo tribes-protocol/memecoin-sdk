@@ -54,7 +54,7 @@ export class TokenSwapper {
       const coin = await this.api.getCoin(contractAddress)
 
       if (contractAddress === WETH_ADDRESS) {
-        return coin?.dexKind === 'memecoinv5'
+        return coin?.dexKind === 'memecoinv5' && coin.dexInitiated
           ? { poolType: TokenPoolType.MEME, poolFee: 10000 }
           : { poolType: TokenPoolType.WETH, poolFee: 0 }
       }
