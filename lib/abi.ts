@@ -1034,14 +1034,31 @@ export const MEMECOIN_V5_LAUNCH_ABI = [
     type: 'function',
     name: 'launch',
     inputs: [
-      { name: '_name', type: 'string', internalType: 'string' },
-      { name: '_symbol', type: 'string', internalType: 'string' },
+      {
+        name: 'creator',
+        type: 'address',
+        internalType: 'address'
+      },
+      {
+        name: '_name',
+        type: 'string',
+        internalType: 'string'
+      },
+      {
+        name: '_symbol',
+        type: 'string',
+        internalType: 'string'
+      },
       {
         name: '_ethAmountToRaise',
         type: 'uint256',
         internalType: 'uint256'
       },
-      { name: '_salt', type: 'bytes32', internalType: 'bytes32' }
+      {
+        name: '_salt',
+        type: 'bytes32',
+        internalType: 'bytes32'
+      }
     ],
     outputs: [
       {
@@ -1059,7 +1076,11 @@ export const MEMECOIN_V5_LAUNCH_ABI = [
         type: 'address',
         internalType: 'address'
       },
-      { name: 'amountOut', type: 'uint256', internalType: 'uint256' }
+      {
+        name: 'amountOut',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
     ],
     stateMutability: 'payable'
   }

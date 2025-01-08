@@ -41,6 +41,7 @@ export interface LaunchCoinParams {
   antiSnipeAmount: bigint
   description: string
   image: string
+  creator?: EthAddress
   website?: string
   twitter?: string
   farcaster?: string
@@ -359,3 +360,10 @@ export const TokenGraduatedEventArgsSchema = z.object({
 })
 
 export type TokenGraduatedEventArgs = z.infer<typeof TokenGraduatedEventArgsSchema>
+
+export interface GetPoolPairsResponse {
+  pools: {
+    tokenIn: ResolveTokenPoolResponse
+    tokenOut: ResolveTokenPoolResponse
+  }[]
+}

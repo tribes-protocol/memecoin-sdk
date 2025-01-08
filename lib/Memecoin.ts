@@ -171,7 +171,7 @@ export class MemecoinSDK {
 
     const walletClient = this.walletClient
 
-    const { antiSnipeAmount, marketCap, name, ticker } = launchParams
+    const { antiSnipeAmount, marketCap, name, ticker, creator } = launchParams
 
     let dexMetadata: DexMetadata | undefined
     const account = walletClient.account
@@ -184,14 +184,14 @@ export class MemecoinSDK {
     const { salt, token } = await this.predictToken({
       name,
       symbol: ticker,
-      account: account.address,
+      account: creator ?? account.address,
       seed: Date.now().toString()
     })
 
     const launchData = encodeFunctionData({
       abi: MEMECOIN_V5_LAUNCH_ABI,
       functionName: 'launch',
-      args: [name, ticker, ethToRaise, salt]
+      args: [creator ?? account.address, name, ticker, ethToRaise, salt]
     })
 
     const launchTx = {
@@ -321,8 +321,8 @@ export class MemecoinSDK {
       address: MEMECOIN_V5_LAUNCHER,
       abi: MEMECOIN_V5_LAUNCH_ABI,
       functionName: 'launch',
-      args: [name, ticker, ethToRaise, salt],
-      value: antiSnipeAmount,
+      args: [account, name, ticker, ethToRaise, salt],
+      value: antiSnipeAmount + parseEther('0.00001'),
       account
     }
     const { result } = await this.publicClient.simulateContract(launchTx)

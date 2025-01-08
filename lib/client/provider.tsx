@@ -13,7 +13,7 @@ import {
   SwapParams
 } from '@/types'
 
-import { createContext, ReactNode, useContext } from 'react'
+import { createContext, ReactNode, useContext, useMemo } from 'react'
 import { useWalletClient } from 'wagmi'
 
 interface MemecoinContextType {
@@ -48,20 +48,24 @@ export const MemecoinProvider = ({
 }: MemecoinProviderProps): ReactNode => {
   const { data: walletClient } = useWalletClient()
 
-  const sdk = new MemecoinSDK({
-    walletClient,
-    rpcUrl,
-    apiBaseUrl
-  })
+  const contextValue = useMemo(() => {
+    const sdk = new MemecoinSDK({
+      walletClient,
+      rpcUrl,
+      apiBaseUrl
+    })
 
-  const contextValue = {
-    getCoin: sdk.getCoin.bind(sdk),
-    getTrending: sdk.getTrending.bind(sdk),
-    estimateSwap: sdk.estimateSwap.bind(sdk),
-    swap: sdk.swap.bind(sdk),
-    launchCoin: sdk.launch.bind(sdk),
-    estimateLaunchBuy: sdk.estimateLaunchBuy.bind(sdk)
-  }
+    console.log('memecoin.new sdk initialized')
+
+    return {
+      getCoin: sdk.getCoin.bind(sdk),
+      getTrending: sdk.getTrending.bind(sdk),
+      estimateSwap: sdk.estimateSwap.bind(sdk),
+      swap: sdk.swap.bind(sdk),
+      launchCoin: sdk.launch.bind(sdk),
+      estimateLaunchBuy: sdk.estimateLaunchBuy.bind(sdk)
+    }
+  }, [walletClient?.account.address, rpcUrl, apiBaseUrl])
 
   return <MemecoinContext.Provider value={contextValue}>{children}</MemecoinContext.Provider>
 }
