@@ -57,8 +57,8 @@ export type EstimateLaunchBuyParams = Omit<LaunchCoinParams, 'description' | 'im
 
 export const DexMetadataSchema = z.object({
   marketAddress: EthAddressSchema.optional(),
-  wethNFTId: z.bigint().optional(),
-  memeNFTId: z.bigint().optional()
+  wethNFTId: z.string().optional(),
+  memeNFTId: z.string().optional()
 })
 
 export type DexMetadata = z.infer<typeof DexMetadataSchema>

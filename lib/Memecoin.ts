@@ -228,8 +228,8 @@ export class MemecoinSDK {
       const args = TokenGraduatedEventArgsSchema.parse(parsedLog.args)
 
       dexMetadata = {
-        wethNFTId: args.wethTokenId,
-        memeNFTId: args.memeTokenId
+        wethNFTId: args.wethTokenId.toString(),
+        memeNFTId: args.memeTokenId.toString()
       }
     } else {
       const result = await retry(() =>
