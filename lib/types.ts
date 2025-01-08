@@ -321,7 +321,12 @@ export interface PredictTokenResponse {
   token: EthAddress
 }
 
-export const LaunchResultSchema = z.tuple([EthAddressSchema, z.bigint(), z.bigint()])
+export const LaunchResultSchema = z.tuple([
+  EthAddressSchema,
+  EthAddressSchema,
+  EthAddressSchema,
+  z.bigint()
+])
 
 export type MarketCapToTickParams = {
   marketCap: number

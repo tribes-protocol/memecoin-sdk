@@ -1058,7 +1058,8 @@ export const MEMECOIN_V5_LAUNCH_ABI = [
         name: 'wethPoolAddress',
         type: 'address',
         internalType: 'address'
-      }
+      },
+      { name: 'amountOut', type: 'uint256', internalType: 'uint256' }
     ],
     stateMutability: 'payable'
   }

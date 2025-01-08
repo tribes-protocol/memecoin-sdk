@@ -17,13 +17,13 @@ import {
   DexMetadata,
   EstimateLaunchBuyParams,
   EstimateSwapParams,
-  EstimateTradeParams,
   EthAddress,
   EthAddressSchema,
   HexString,
   HydratedCoin,
   LaunchCoinParams,
   LaunchCoinResponse,
+  LaunchResultSchema,
   MemecoinSDKConfig,
   PredictTokenParams,
   PredictTokenResponse,
@@ -139,10 +139,6 @@ export class MemecoinSDK {
     return this.api.getTrending()
   }
 
-  async estimateBuy(params: EstimateTradeParams): Promise<bigint> {
-    return this.api.estimateBuy(params.coin, params.amountIn)
-  }
-
   private async isBatchSupported(): Promise<boolean> {
     let batchSupported = false
     try {
@@ -153,10 +149,6 @@ export class MemecoinSDK {
     }
 
     return batchSupported
-  }
-
-  async estimateSell(params: EstimateTradeParams): Promise<bigint> {
-    return this.api.estimateSell(params.coin, params.amountIn)
   }
 
   async estimateSwap(params: EstimateSwapParams): Promise<SwapEstimation> {
@@ -315,41 +307,28 @@ export class MemecoinSDK {
     }
   }
 
-  async estimateLaunchBuy(_params: EstimateLaunchBuyParams): Promise<bigint> {
-    // if (params.kind !== 'direct') {
-    //   throw new Error('Only direct launch is currentlysupported')
-    // }
+  async estimateLaunchBuy(params: EstimateLaunchBuyParams): Promise<bigint> {
+    const { name, ticker, antiSnipeAmount, account, marketCap } = params
 
-    // const { name, ticker, antiSnipeAmount, account, tick, fee, salt } = params
+    const ethToRaise = marketCap > 0 ? await this.getEthToRaise(marketCap) : 0n
 
-    // const tokenData = ''
+    const { salt } = await this.predictDirectLaunchToken({
+      name,
+      symbol: ticker,
+      account,
+      seed: Date.now().toString()
+    })
 
-    // const launchArgs = {
-    //   _name: name,
-    //   _symbol: ticker,
-    //   _supply: INITIAL_SUPPLY,
-    //   _initialTick: tick,
-    //   _fee: fee,
-    //   _salt: salt,
-    //   _deployer: account,
-    //   _data: tokenData
-    // }
-
-    // const launchTx = {
-    //   address: UNISWAP_V3_LAUNCHER,
-    //   abi: UNISWAPV3_LAUNCH_ABI,
-    //   functionName: 'launch',
-    //   args: Object.values(launchArgs),
-    //   value: antiSnipeAmount,
-    //   account
-    // }
-
-    // const { result } = await this.publicClient.simulateContract(launchTx)
-
-    // const [, , amountSwapped] = LaunchResultSchema.parse(result)
-
-    // return amountSwapped
-
-    return 0n
+    const launchTx = {
+      address: MEMECOIN_V5_LAUNCHER,
+      abi: MEMECOIN_V5_LAUNCH_ABI,
+      functionName: 'launch',
+      args: [name, ticker, ethToRaise, salt],
+      value: antiSnipeAmount,
+      account
+    }
+    const { result } = await this.publicClient.simulateContract(launchTx)
+    const [, , , amountSwapped] = LaunchResultSchema.parse(result)
+    return amountSwapped
   }
 }
