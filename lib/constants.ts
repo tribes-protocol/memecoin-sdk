@@ -5,7 +5,7 @@ import {
   SELL_TOKENS_ABI_V2,
   SWAP_MEMECOIN_ABI
 } from '@/abi'
-import { ABI, EthAddress, EthAddressSchema } from '@/types'
+import { ABI, EthAddress, EthAddressSchema, HexStringSchema } from '@/types'
 import { parseUnits } from 'viem'
 import { z } from 'zod'
 
@@ -74,8 +74,6 @@ export const MULTISIG_FEE_COLLECTOR = EthAddressSchema.parse(
   '0x9A142B38d483d150dB2c115b4efA5ca37aC57Ebc'
 )
 
-export const SWAPPER_CONTRACT = EthAddressSchema.parse('0x01c3a265E70335e37BF78C9F492eA68e057D3810')
-
 export const WETH_ADDRESS = EthAddressSchema.parse('0x4200000000000000000000000000000000000006')
 
 function findMemeVersionByMemePool(memePool: EthAddress): MemeContracts {
@@ -139,3 +137,15 @@ export const CapabilitiesSchema = z.object({
 export const LN_1_0001 = Math.log(1.0001)
 
 export const UNISWAP_FEE_TIERS = [500, 3000, 10000]
+
+export const MEMECOIN_V5_LAUNCHER = EthAddressSchema.parse(
+  '0x793ae420119Dfc600b51C5886E488CA8847B710e'
+)
+
+export const TOKEN_SWAPPER_ADDRESS = EthAddressSchema.parse(
+  '0x49Bf62004d33F1B9B6dc68F26BE346579Fa2e976'
+)
+
+export const TOKEN_GRADUATED_HASH = HexStringSchema.parse(
+  '0x1669614928af055cd5932e43424383a863eb888f3e3a9f80f443162171c568b6'
+)

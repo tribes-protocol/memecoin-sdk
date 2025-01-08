@@ -2,14 +2,15 @@ import { SWAP_ABI } from '@/abi'
 import { MemecoinAPI } from '@/api'
 import {
   MULTISIG_FEE_COLLECTOR,
-  SWAPPER_CONTRACT,
+  TOKEN_SWAPPER_ADDRESS,
   UNISWAP_FEE_TIERS,
   WETH_ADDRESS
 } from '@/constants'
-import { calculateMinAmountWithSlippage, isBigInt, isNull } from '@/functions'
+import { calculateMinAmountWithSlippage, compactMap, isBigInt, isNull } from '@/functions'
 import {
   EstimateSwapParams,
   EthAddress,
+  GetPoolPairsResponse,
   HexString,
   HydratedCoin,
   MemecoinSDKConfig,
@@ -22,14 +23,14 @@ import { UniswapV2 } from '@/uniswapv2'
 import { UniswapV3 } from '@/uniswapv3'
 import { getWalletClient } from '@/walletclient'
 import { LRUCache } from 'lru-cache'
-import { Abi, encodeFunctionData, PublicClient, WalletClient } from 'viem'
+import { Abi, encodeFunctionData, formatEther, PublicClient, WalletClient } from 'viem'
 import { base } from 'viem/chains'
 import { eip5792Actions, writeContracts } from 'viem/experimental'
 
 export class TokenSwapper {
-  private poolCache = new LRUCache<EthAddress, Promise<ResolveTokenPoolResponse>>({
+  private poolCache = new LRUCache<string, Promise<GetPoolPairsResponse>>({
     max: 10000,
-    ttl: 1000 * 60 * 5 // 5 mins
+    ttl: 1000 * 60 // 1 min
   })
 
   constructor(
@@ -44,96 +45,134 @@ export class TokenSwapper {
     return getWalletClient(this.config)
   }
 
-  private async getPool(contractAddress: EthAddress): Promise<ResolveTokenPoolResponse> {
-    const cachedPool = this.poolCache.get(contractAddress)
+  private async getPoolPairs(
+    tokenIn: EthAddress,
+    tokenOut: EthAddress
+  ): Promise<GetPoolPairsResponse> {
+    const cacheKey = `${tokenIn}-${tokenOut}`
+    const cachedPool = this.poolCache.get(cacheKey)
     if (cachedPool) {
       return cachedPool
     }
 
     const promise = (async () => {
-      if (contractAddress === WETH_ADDRESS) {
-        return { poolType: TokenPoolType.WETH, poolFee: 0 }
+      const [coinIn, coinOut] = await Promise.all([
+        this.api.getCoin(tokenIn),
+        this.api.getCoin(tokenOut)
+      ])
+
+      if (tokenIn === WETH_ADDRESS) {
+        const coinOutPool = coinOut
+          ? this.resolvePoolOfMemecoin(coinOut)
+          : await this.resolveTokenWETHPool(tokenOut)
+
+        if (coinOut?.dexKind === 'memecoinv5' && coinOut.dexInitiated) {
+          return {
+            pools: [
+              { tokenIn: { poolType: TokenPoolType.MEME, poolFee: 0 }, tokenOut: coinOutPool }
+            ]
+          }
+        }
+
+        return {
+          pools: [{ tokenIn: { poolType: TokenPoolType.WETH, poolFee: 0 }, tokenOut: coinOutPool }]
+        }
       }
 
-      const coin = await this.api.getCoin(contractAddress)
+      const coinInPool = coinIn
+        ? this.resolvePoolOfMemecoin(coinIn)
+        : await this.resolveTokenWETHPool(tokenIn)
 
-      if (coin) {
-        return this.resolvePoolOfMemecoin(coin)
+      const coinOutPool =
+        tokenOut === WETH_ADDRESS
+          ? { poolType: TokenPoolType.WETH, poolFee: 0 }
+          : coinOut
+            ? this.resolvePoolOfMemecoin(coinOut)
+            : await this.resolveTokenWETHPool(tokenOut)
+
+      return {
+        pools: [{ tokenIn: coinInPool, tokenOut: coinOutPool }]
       }
-
-      return this.resolveTokenWETHPool(contractAddress)
     })()
 
-    this.poolCache.set(contractAddress, promise)
+    this.poolCache.set(cacheKey, promise)
 
-    try {
-      return await promise
-    } catch (error) {
-      this.poolCache.delete(contractAddress)
-      throw error
-    }
+    return promise
   }
 
   async estimateSwap(params: EstimateSwapParams): Promise<SwapEstimation> {
-    const { tokenIn, tokenOut, amountIn, address, recipient, orderReferrer, slippage } = params
+    const { tokenIn, tokenOut, amountIn, account, recipient, orderReferrer, slippage } = params
 
     if (params.skipCache) {
       this.poolCache.delete(tokenIn)
       this.poolCache.delete(tokenOut)
     }
 
-    const [tokenInData, tokenOutData, allowance] = await Promise.all([
-      this.getPool(tokenIn),
-      this.getPool(tokenOut),
-      this.api.getERC20Allowance(tokenIn, SWAPPER_CONTRACT, address)
+    const [poolPairs, allowance] = await Promise.all([
+      this.getPoolPairs(tokenIn, tokenOut),
+      this.api.getERC20Allowance(tokenIn, TOKEN_SWAPPER_ADDRESS, account)
     ])
 
-    const tokenInPoolType = tokenInData.poolType
-    const feeIn = tokenInData.poolFee
-    const tokenOutPoolType = tokenOutData.poolType
-    const feeOut = tokenOutData.poolFee
+    const estimates = await Promise.all(
+      poolPairs.pools.map(async (pool) => {
+        try {
+          const args = {
+            tokenIn,
+            tokenOut,
+            tokenInPoolType: pool.tokenIn.poolType,
+            tokenOutPoolType: pool.tokenOut.poolType,
+            recipient: recipient ?? account,
+            amountIn,
+            amountOutMinimum: 0n,
+            orderReferrer: orderReferrer ?? MULTISIG_FEE_COLLECTOR,
+            feeIn: tokenIn === WETH_ADDRESS ? pool.tokenOut.poolFee : 0,
+            feeOut: pool.tokenOut.poolFee
+          }
 
-    if (isNull(tokenInPoolType) || isNull(tokenOutPoolType)) {
-      throw new Error('No pool type found')
-    }
+          const { result } = await this.publicClient.simulateContract({
+            account,
+            address: TOKEN_SWAPPER_ADDRESS,
+            abi: SWAP_ABI,
+            functionName: 'estimateSwap',
+            args: [args]
+          })
 
-    const { result } = await this.publicClient.simulateContract({
-      account: address,
-      address: SWAPPER_CONTRACT,
-      abi: SWAP_ABI,
-      functionName: 'estimateSwap',
-      args: [
-        {
-          tokenIn,
-          tokenOut,
-          tokenInPoolType,
-          tokenOutPoolType,
-          recipient: recipient ?? address,
-          amountIn,
-          amountOutMinimum: 0n,
-          orderReferrer: orderReferrer ?? MULTISIG_FEE_COLLECTOR,
-          feeIn,
-          feeOut
+          console.log('result', formatEther(result), pool.tokenIn.poolType)
+
+          if (!isBigInt(result)) {
+            throw new Error('Invalid response format')
+          }
+
+          return {
+            amountOut: result,
+            swapParams: {
+              ...params,
+              allowance,
+              feeIn: pool.tokenIn.poolFee,
+              feeOut: pool.tokenOut.poolFee,
+              tokenInPoolType: pool.tokenIn.poolType,
+              tokenOutPoolType: pool.tokenOut.poolType,
+              amountOutMinimum: calculateMinAmountWithSlippage(result, slippage)
+            }
+          }
+        } catch (e) {
+          console.log(`pool.tokenIn.poolType: ${pool.tokenIn.poolType}`, e)
+          return null
         }
-      ]
-    })
+      })
+    )
 
-    if (!isBigInt(result)) {
-      throw new Error('Invalid response format')
+    const validEstimates = compactMap(estimates)
+
+    if (validEstimates.length === 0) {
+      throw new Error('No valid estimates found')
     }
 
-    return {
-      amountOut: result,
-      swapParams: {
-        ...params,
-        allowance,
-        feeIn,
-        feeOut,
-        tokenInPoolType,
-        tokenOutPoolType,
-        amountOutMinimum: calculateMinAmountWithSlippage(result, slippage)
-      }
-    }
+    const bestEstimate = validEstimates.reduce((best, current) =>
+      current.amountOut > best.amountOut ? current : best
+    )
+
+    return bestEstimate
   }
 
   async swap(params: SwapParams, isBatchSupported: boolean): Promise<HexString> {
@@ -170,34 +209,34 @@ export class TokenSwapper {
         }
       ],
       functionName: 'approve',
-      args: [SWAPPER_CONTRACT, amountIn]
-    } as const
-
-    const swapContractCall = {
-      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-      abi: SWAP_ABI as Abi,
-      address: SWAPPER_CONTRACT,
-      functionName: 'swap',
-      args: [
-        {
-          tokenIn,
-          tokenOut,
-          tokenInPoolType,
-          tokenOutPoolType,
-          recipient: recipient ?? walletClient.account,
-          amountIn,
-          amountOutMinimum: amountOutMin,
-          orderReferrer: orderReferrer ?? MULTISIG_FEE_COLLECTOR,
-          feeIn: feeIn ?? 0,
-          feeOut: feeOut ?? 0
-        }
-      ]
+      args: [TOKEN_SWAPPER_ADDRESS, amountIn]
     } as const
 
     const account = walletClient.account
     if (isNull(account)) {
       throw new Error('No account found')
     }
+
+    const args = {
+      tokenIn,
+      tokenOut,
+      tokenInPoolType,
+      tokenOutPoolType,
+      recipient: recipient ?? account.address,
+      amountIn,
+      amountOutMinimum: amountOutMin,
+      orderReferrer: orderReferrer ?? MULTISIG_FEE_COLLECTOR,
+      feeIn: feeIn ?? 0,
+      feeOut: feeOut ?? 0
+    }
+
+    const swapContractCall = {
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+      abi: SWAP_ABI as Abi,
+      address: TOKEN_SWAPPER_ADDRESS,
+      functionName: 'swap',
+      args: [args]
+    } as const
 
     if (isBatchSupported) {
       const result = await writeContracts(walletClient, {
@@ -264,10 +303,11 @@ export class TokenSwapper {
       const data = encodeFunctionData(swapContractCall)
 
       const txParams = {
-        to: SWAPPER_CONTRACT,
+        to: TOKEN_SWAPPER_ADDRESS,
         data,
         account,
-        chain: base
+        chain: base,
+        value: tokenInPoolType === TokenPoolType.WETH ? amountIn : 0n
       }
 
       const gas = ((await this.publicClient.estimateGas(txParams)) * 125n) / 100n
@@ -288,7 +328,13 @@ export class TokenSwapper {
 
   private resolvePoolOfMemecoin(memecoin: HydratedCoin): ResolveTokenPoolResponse {
     if (!memecoin.dexInitiated) {
-      return { poolType: TokenPoolType.BondingCurve, poolFee: 0 }
+      return {
+        poolType:
+          memecoin.dexKind === 'memecoinv5'
+            ? TokenPoolType.BondingCurveV2
+            : TokenPoolType.BondingCurveV1,
+        poolFee: 0
+      }
     }
 
     switch (memecoin.dexKind) {
@@ -296,6 +342,7 @@ export class TokenSwapper {
         return { poolType: TokenPoolType.UniswapV2, poolFee: 0 }
       case 'univ3':
       case 'univ3-bonding':
+      case 'memecoinv5':
         return { poolType: TokenPoolType.UniswapV3, poolFee: 10000 }
     }
   }

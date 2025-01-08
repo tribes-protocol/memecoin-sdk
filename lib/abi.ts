@@ -901,7 +901,7 @@ export const SWAP_ABI = [
       {
         name: 'params',
         type: 'tuple',
-        internalType: 'struct TokenSwapper.SwapParams',
+        internalType: 'struct ITokenSwapper.SwapParams',
         components: [
           { name: 'tokenIn', type: 'address', internalType: 'address' },
           {
@@ -912,12 +912,12 @@ export const SWAP_ABI = [
           {
             name: 'tokenInPoolType',
             type: 'uint8',
-            internalType: 'enum TokenSwapper.TokenPoolType'
+            internalType: 'enum ITokenSwapper.TokenPoolType'
           },
           {
             name: 'tokenOutPoolType',
             type: 'uint8',
-            internalType: 'enum TokenSwapper.TokenPoolType'
+            internalType: 'enum ITokenSwapper.TokenPoolType'
           },
           {
             name: 'recipient',
@@ -954,7 +954,7 @@ export const SWAP_ABI = [
       {
         name: 'params',
         type: 'tuple',
-        internalType: 'struct BondingSwap.SwapParams',
+        internalType: 'struct ITokenSwapper.SwapParams',
         components: [
           { name: 'tokenIn', type: 'address', internalType: 'address' },
           {
@@ -965,12 +965,12 @@ export const SWAP_ABI = [
           {
             name: 'tokenInPoolType',
             type: 'uint8',
-            internalType: 'enum BondingSwap.TokenPoolType'
+            internalType: 'enum ITokenSwapper.TokenPoolType'
           },
           {
             name: 'tokenOutPoolType',
             type: 'uint8',
-            internalType: 'enum BondingSwap.TokenPoolType'
+            internalType: 'enum ITokenSwapper.TokenPoolType'
           },
           {
             name: 'recipient',
@@ -1026,5 +1026,214 @@ export const UNISWAP_V2_PAIR_ABI = [
       { name: 'blockTimestampLast', type: 'uint32' }
     ],
     type: 'function'
+  }
+]
+
+export const MEMECOIN_V5_LAUNCH_ABI = [
+  {
+    type: 'function',
+    name: 'launch',
+    inputs: [
+      {
+        name: 'creator',
+        type: 'address',
+        internalType: 'address'
+      },
+      {
+        name: '_name',
+        type: 'string',
+        internalType: 'string'
+      },
+      {
+        name: '_symbol',
+        type: 'string',
+        internalType: 'string'
+      },
+      {
+        name: '_ethAmountToRaise',
+        type: 'uint256',
+        internalType: 'uint256'
+      },
+      {
+        name: '_salt',
+        type: 'bytes32',
+        internalType: 'bytes32'
+      }
+    ],
+    outputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address'
+      },
+      {
+        name: 'memePoolAddress',
+        type: 'address',
+        internalType: 'address'
+      },
+      {
+        name: 'wethPoolAddress',
+        type: 'address',
+        internalType: 'address'
+      },
+      {
+        name: 'amountOut',
+        type: 'uint256',
+        internalType: 'uint256'
+      }
+    ],
+    stateMutability: 'payable'
+  }
+]
+
+export const MEMECOIN_V5_PREDICT_TOKEN_ABI = [
+  {
+    type: 'function',
+    name: 'predictToken',
+    inputs: [
+      { name: 'deployer', type: 'address', internalType: 'address' },
+      { name: 'name', type: 'string', internalType: 'string' },
+      { name: 'symbol', type: 'string', internalType: 'string' },
+      { name: 'seed', type: 'string', internalType: 'string' }
+    ],
+    outputs: [
+      { name: 'salt', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'token', type: 'address', internalType: 'address' }
+    ],
+    stateMutability: 'view'
+  }
+]
+
+export const TOKEN_GRADUATED_EVENT_ABI = [
+  {
+    type: 'event',
+    name: 'TokenGraduated',
+    inputs: [
+      { name: 'tokenAddress', type: 'address', internalType: 'address', indexed: true },
+      { name: 'memeTokenId', type: 'uint256', internalType: 'uint256' },
+      { name: 'wethTokenId', type: 'uint256', internalType: 'uint256' }
+    ],
+    anonymous: false
+  }
+]
+
+export const MARKET_ABI = [
+  {
+    type: 'function',
+    name: 'buy',
+    inputs: [
+      { name: 'recipient', type: 'address', internalType: 'address' },
+      {
+        name: 'orderReferrer',
+        type: 'address',
+        internalType: 'address'
+      },
+      { name: 'minAmountOut', type: 'uint256', internalType: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'payable'
+  },
+  {
+    type: 'function',
+    name: 'creator',
+    inputs: [],
+    outputs: [{ name: '', type: 'address', internalType: 'address' }],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'creatorFeeBps',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'estimateBuy',
+    inputs: [{ name: 'ethAmount', type: 'uint256', internalType: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'estimateSell',
+    inputs: [{ name: 'tokenAmount', type: 'uint256', internalType: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'memePoolAddress',
+    inputs: [],
+    outputs: [{ name: '', type: 'address', internalType: 'address' }],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'protocolFeeBps',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'raiseETH',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'referrerFeeBps',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'remainingSupply',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'sell',
+    inputs: [
+      { name: 'recipient', type: 'address', internalType: 'address' },
+      { name: 'amountIn', type: 'uint256', internalType: 'uint256' },
+      {
+        name: 'orderReferrer',
+        type: 'address',
+        internalType: 'address'
+      },
+      { name: 'minAmountOut', type: 'uint256', internalType: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'payable'
+  },
+  {
+    type: 'function',
+    name: 'tokenAddress',
+    inputs: [],
+    outputs: [{ name: '', type: 'address', internalType: 'address' }],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'totalFeeBps',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view'
+  }
+]
+
+export const TOKEN_MARKET_ADDRESS_ABI = [
+  {
+    type: 'function',
+    name: 'marketAddress',
+    inputs: [],
+    outputs: [{ name: '', type: 'address', internalType: 'address' }],
+    stateMutability: 'view'
   }
 ]

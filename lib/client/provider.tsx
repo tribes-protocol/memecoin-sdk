@@ -2,46 +2,27 @@
 
 import { MemecoinSDK } from '@/Memecoin'
 import {
-  BuyFrontendParams,
   EstimateLaunchBuyParams,
   EstimateSwapParams,
-  EstimateTradeParams,
   EthAddress,
-  GenerateSaltParams,
   HexString,
   HydratedCoin,
   LaunchCoinParams,
   LaunchCoinResponse,
-  MarketCapToTickParams,
-  PredictTokenParams,
-  SellFrontendParams,
   SwapEstimation,
   SwapParams
 } from '@/types'
-import { Pair } from '@uniswap/v2-sdk'
-import { createContext, ReactNode, useContext } from 'react'
+
+import { createContext, ReactNode, useContext, useMemo } from 'react'
 import { useWalletClient } from 'wagmi'
 
 interface MemecoinContextType {
   getCoin: (id: EthAddress | number) => Promise<HydratedCoin | undefined>
   getTrending: () => Promise<HydratedCoin[]>
   estimateSwap: (params: EstimateSwapParams) => Promise<SwapEstimation>
-  estimateBuy: (params: EstimateTradeParams) => Promise<bigint>
-  buy: (params: BuyFrontendParams) => Promise<HexString>
-  sell: (params: SellFrontendParams) => Promise<HexString>
-  estimateSell: (params: EstimateTradeParams) => Promise<bigint>
   swap: (params: SwapParams) => Promise<HexString>
   launchCoin: (params: LaunchCoinParams) => Promise<LaunchCoinResponse>
-  getPair: (coin: EthAddress) => Promise<Pair>
-  getERC20Allowance: (
-    tokenAddress: EthAddress,
-    spenderAddress: EthAddress,
-    accountAddress: EthAddress
-  ) => Promise<bigint>
-  generateDirectLaunchSalt: (params: GenerateSaltParams) => Promise<HexString>
-  predictDirectLaunchToken: (params: PredictTokenParams) => Promise<HexString>
   estimateLaunchBuy: (params: EstimateLaunchBuyParams) => Promise<bigint>
-  calculateDirectLaunchTick: (params: MarketCapToTickParams) => Promise<number>
 }
 
 interface MemecoinProviderProps {
@@ -67,29 +48,24 @@ export const MemecoinProvider = ({
 }: MemecoinProviderProps): ReactNode => {
   const { data: walletClient } = useWalletClient()
 
-  const sdk = new MemecoinSDK({
-    walletClient,
-    rpcUrl,
-    apiBaseUrl
-  })
+  const contextValue = useMemo(() => {
+    const sdk = new MemecoinSDK({
+      walletClient,
+      rpcUrl,
+      apiBaseUrl
+    })
 
-  const contextValue = {
-    getCoin: sdk.getCoin.bind(sdk),
-    getTrending: sdk.getTrending.bind(sdk),
-    estimateSwap: sdk.estimateSwap.bind(sdk),
-    estimateBuy: sdk.estimateBuy.bind(sdk),
-    buy: sdk.buy.bind(sdk),
-    estimateSell: sdk.estimateSell.bind(sdk),
-    sell: sdk.sell.bind(sdk),
-    swap: sdk.swap.bind(sdk),
-    launchCoin: sdk.launch.bind(sdk),
-    getPair: sdk.getUniswapPair.bind(sdk),
-    getERC20Allowance: sdk.getERC20Allowance.bind(sdk),
-    generateDirectLaunchSalt: sdk.generateDirectLaunchSalt.bind(sdk),
-    predictDirectLaunchToken: sdk.predictDirectLaunchToken.bind(sdk),
-    estimateLaunchBuy: sdk.estimateLaunchBuy.bind(sdk),
-    calculateDirectLaunchTick: sdk.calculateDirectLaunchTick.bind(sdk)
-  }
+    console.log('memecoin.new sdk initialized')
+
+    return {
+      getCoin: sdk.getCoin.bind(sdk),
+      getTrending: sdk.getTrending.bind(sdk),
+      estimateSwap: sdk.estimateSwap.bind(sdk),
+      swap: sdk.swap.bind(sdk),
+      launchCoin: sdk.launch.bind(sdk),
+      estimateLaunchBuy: sdk.estimateLaunchBuy.bind(sdk)
+    }
+  }, [walletClient?.account.address, rpcUrl, apiBaseUrl])
 
   return <MemecoinContext.Provider value={contextValue}>{children}</MemecoinContext.Provider>
 }
