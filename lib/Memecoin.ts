@@ -35,7 +35,6 @@ import {
 import { UniswapV2 } from '@/uniswapv2'
 import { UniswapV3 } from '@/uniswapv3'
 import { getWalletClient } from '@/walletclient'
-import { Pair } from '@uniswap/v2-sdk'
 import {
   Chain,
   createPublicClient,
@@ -175,7 +174,6 @@ export class MemecoinSDK {
     const { antiSnipeAmount, marketCap, name, ticker } = launchParams
 
     let dexMetadata: DexMetadata | undefined
-    let blockNumber: bigint | undefined
     const account = walletClient.account
     if (isNull(account)) {
       throw new Error('No account found')
@@ -183,11 +181,11 @@ export class MemecoinSDK {
 
     const ethToRaise = marketCap > 0 ? await this.getEthToRaise(marketCap) : 0n
 
-    const { salt, token } = await this.predictDirectLaunchToken({
+    const { salt, token } = await this.predictToken({
       name,
       symbol: ticker,
       account: account.address,
-      seed: Date.now().toString() // what should this be?
+      seed: Date.now().toString()
     })
 
     const launchData = encodeFunctionData({
@@ -210,8 +208,11 @@ export class MemecoinSDK {
       hash: txHash,
       confirmations: 2
     })
+    const blockNumber = receipt.blockNumber
+    const isDirectLaunch = marketCap === 0
 
-    if (marketCap === 0) {
+    if (isDirectLaunch) {
+      // direct launch
       const graduatedLog = receipt.logs.find((log) => log.topics[0] === TOKEN_GRADUATED_HASH)
       if (isNull(graduatedLog)) {
         throw new Error('Failed to find token graduated event log')
@@ -232,6 +233,7 @@ export class MemecoinSDK {
         memeNFTId: args.memeTokenId.toString()
       }
     } else {
+      // market launch
       const result = await retry(() =>
         this.publicClient.readContract({
           address: token,
@@ -251,8 +253,8 @@ export class MemecoinSDK {
       {
         ...launchParams,
         dexMetadata: dexMetadata ? JSON.stringify(dexMetadata) : null,
-        dexInitiated: marketCap === 0,
-        dexInitiatedBlock: marketCap === 0 && blockNumber ? blockNumber : null,
+        dexInitiated: isDirectLaunch,
+        dexInitiatedBlock: isDirectLaunch ? blockNumber : null,
         censored: false,
         contractAddress: token,
         creator: account.address,
@@ -271,15 +273,11 @@ export class MemecoinSDK {
 
   private async getEthToRaise(marketCap: number): Promise<bigint> {
     const ethPrice = await this.uniswapV3.fetchEthereumPrice()
-    const eth = (marketCap / (5 * ethPrice.price.toNumber())) * 1.05
+    const eth = (marketCap / (5 * ethPrice.price.toNumber())) * 1.03
     return parseEther(eth.toString())
   }
 
-  async getUniswapPair(coin: EthAddress): Promise<Pair> {
-    return this.uniswapV2.getPair(coin)
-  }
-
-  async getERC20Allowance(
+  private async getERC20Allowance(
     tokenAddress: EthAddress,
     spenderAddress: EthAddress,
     accountAddress: EthAddress
@@ -287,7 +285,7 @@ export class MemecoinSDK {
     return this.api.getERC20Allowance(tokenAddress, spenderAddress, accountAddress)
   }
 
-  async predictDirectLaunchToken(params: PredictTokenParams): Promise<PredictTokenResponse> {
+  private async predictToken(params: PredictTokenParams): Promise<PredictTokenResponse> {
     const { account, name, symbol, seed } = params
 
     const result = await retry(() =>
@@ -312,7 +310,7 @@ export class MemecoinSDK {
 
     const ethToRaise = marketCap > 0 ? await this.getEthToRaise(marketCap) : 0n
 
-    const { salt } = await this.predictDirectLaunchToken({
+    const { salt } = await this.predictToken({
       name,
       symbol: ticker,
       account,
