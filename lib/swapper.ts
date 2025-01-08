@@ -125,7 +125,7 @@ export class TokenSwapper {
             amountIn,
             amountOutMinimum: 0n,
             orderReferrer: orderReferrer ?? MULTISIG_FEE_COLLECTOR,
-            feeIn: tokenIn === WETH_ADDRESS ? pool.tokenOut.poolFee : 0,
+            feeIn: pool.tokenIn.poolFee,
             feeOut: pool.tokenOut.poolFee
           }
 
