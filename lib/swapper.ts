@@ -175,12 +175,17 @@ export class TokenSwapper {
       args: [SWAPPER_CONTRACT, amountIn]
     } as const
 
+    const account = walletClient.account
+    if (isNull(account)) {
+      throw new Error('No account found')
+    }
+
     const args = {
       tokenIn,
       tokenOut,
       tokenInPoolType,
       tokenOutPoolType,
-      recipient: recipient ?? walletClient.account?.address,
+      recipient: recipient ?? account.address,
       amountIn,
       amountOutMinimum: amountOutMin,
       orderReferrer: orderReferrer ?? MULTISIG_FEE_COLLECTOR,
@@ -195,11 +200,6 @@ export class TokenSwapper {
       functionName: 'swap',
       args: [args]
     } as const
-
-    const account = walletClient.account
-    if (isNull(account)) {
-      throw new Error('No account found')
-    }
 
     if (isBatchSupported) {
       const result = await writeContracts(walletClient, {
