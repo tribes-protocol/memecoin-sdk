@@ -305,7 +305,7 @@ export class TokenSwapper {
         data,
         account,
         chain: base,
-        value: tokenInPoolType === TokenPoolType.WETH ? amountIn : 0n
+        value: tokenIn === WETH_ADDRESS ? amountIn : 0n
       }
 
       const gas = ((await this.publicClient.estimateGas(txParams)) * 125n) / 100n
