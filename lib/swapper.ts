@@ -242,9 +242,7 @@ export class TokenSwapper {
       const result = await writeContracts(walletClient, {
         contracts: [
           // approve
-          ...(tokenInPoolType !== TokenPoolType.WETH && allowance < amountIn
-            ? [approveContractCall]
-            : []),
+          ...(tokenIn !== WETH_ADDRESS && allowance < amountIn ? [approveContractCall] : []),
           // swap
           swapContractCall
         ],
@@ -278,7 +276,7 @@ export class TokenSwapper {
 
       return lastReceipt.transactionHash
     } else {
-      if (tokenInPoolType !== TokenPoolType.WETH && allowance < amountIn) {
+      if (tokenIn !== WETH_ADDRESS && allowance < amountIn) {
         const data = encodeFunctionData(approveContractCall)
         const txParams = {
           to: tokenIn,
