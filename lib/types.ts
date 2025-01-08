@@ -34,9 +34,7 @@ export type MemecoinSDKConfig =
       privateKey?: HexString
     })
 
-export interface BaseLaunchCoinParams {}
-
-export interface LaunchCoinParams extends BaseLaunchCoinParams {
+export interface LaunchCoinParams {
   marketCap: number // market cap in USD, 0 for direct launch
   name: string
   ticker: string
@@ -283,7 +281,7 @@ export interface EstimateSwapParams {
   tokenIn: EthAddress
   tokenOut: EthAddress
   amountIn: bigint
-  address: EthAddress
+  account: EthAddress
   recipient?: EthAddress
   orderReferrer?: EthAddress
   slippage?: number

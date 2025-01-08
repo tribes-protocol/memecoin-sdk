@@ -149,5 +149,3 @@ export const TOKEN_SWAPPER_ADDRESS = EthAddressSchema.parse(
 export const TOKEN_GRADUATED_HASH = HexStringSchema.parse(
   '0x1669614928af055cd5932e43424383a863eb888f3e3a9f80f443162171c568b6'
 )
-
-export const SWAPPER_CONTRACT = EthAddressSchema.parse('0x825520c1C3f79D3C195AF88f062b050C63C74cB8')

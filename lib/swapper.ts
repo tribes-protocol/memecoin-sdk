@@ -2,7 +2,7 @@ import { SWAP_ABI } from '@/abi'
 import { MemecoinAPI } from '@/api'
 import {
   MULTISIG_FEE_COLLECTOR,
-  SWAPPER_CONTRACT,
+  TOKEN_SWAPPER_ADDRESS,
   UNISWAP_FEE_TIERS,
   WETH_ADDRESS
 } from '@/constants'
@@ -77,7 +77,7 @@ export class TokenSwapper {
   }
 
   async estimateSwap(params: EstimateSwapParams): Promise<SwapEstimation> {
-    const { tokenIn, tokenOut, amountIn, address, recipient, orderReferrer, slippage } = params
+    const { tokenIn, tokenOut, amountIn, account, recipient, orderReferrer, slippage } = params
 
     if (params.skipCache) {
       this.poolCache.delete(tokenIn)
@@ -87,7 +87,7 @@ export class TokenSwapper {
     const [tokenInData, tokenOutData, allowance] = await Promise.all([
       this.getPool(tokenIn),
       this.getPool(tokenOut),
-      this.api.getERC20Allowance(tokenIn, SWAPPER_CONTRACT, address)
+      this.api.getERC20Allowance(tokenIn, TOKEN_SWAPPER_ADDRESS, account)
     ])
 
     const tokenInPoolType = tokenInData.poolType
@@ -100,8 +100,8 @@ export class TokenSwapper {
     }
 
     const { result } = await this.publicClient.simulateContract({
-      account: address,
-      address: SWAPPER_CONTRACT,
+      account,
+      address: TOKEN_SWAPPER_ADDRESS,
       abi: SWAP_ABI,
       functionName: 'estimateSwap',
       args: [
@@ -110,7 +110,7 @@ export class TokenSwapper {
           tokenOut,
           tokenInPoolType,
           tokenOutPoolType,
-          recipient: recipient ?? address,
+          recipient: recipient ?? account,
           amountIn,
           amountOutMinimum: 0n,
           orderReferrer: orderReferrer ?? MULTISIG_FEE_COLLECTOR,
@@ -172,7 +172,7 @@ export class TokenSwapper {
         }
       ],
       functionName: 'approve',
-      args: [SWAPPER_CONTRACT, amountIn]
+      args: [TOKEN_SWAPPER_ADDRESS, amountIn]
     } as const
 
     const account = walletClient.account
@@ -196,7 +196,7 @@ export class TokenSwapper {
     const swapContractCall = {
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       abi: SWAP_ABI as Abi,
-      address: SWAPPER_CONTRACT,
+      address: TOKEN_SWAPPER_ADDRESS,
       functionName: 'swap',
       args: [args]
     } as const
@@ -266,7 +266,7 @@ export class TokenSwapper {
       const data = encodeFunctionData(swapContractCall)
 
       const txParams = {
-        to: SWAPPER_CONTRACT,
+        to: TOKEN_SWAPPER_ADDRESS,
         data,
         account,
         chain: base,
