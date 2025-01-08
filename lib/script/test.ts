@@ -23,8 +23,13 @@ async function launchToken(): Promise<void> {
       marketCap: 21000,
       antiSnipeAmount: parseEther('0.00001'), // 0.1 ETH anti-snipe,
       description: 'Test Coin',
-      image: 'https://via.placeholder.com/150'
+      image: 'https://via.placeholder.com/150',
+      account: account.address
     }
+
+    const estimate = await sdk.estimateLaunchBuy(launchParams)
+
+    console.log('estimate', formatEther(estimate))
 
     const result = await sdk.launch(launchParams)
 
