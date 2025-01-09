@@ -15,7 +15,8 @@ import { isBatchSupported, isNull, retry } from '@/functions'
 import { TokenSwapper } from '@/swapper'
 import {
   DexMetadata,
-  EstimateLaunchBuyParams,
+  EstimateLaunchParams,
+  EstimateLaunchResponse,
   EstimateSwapParams,
   EthAddress,
   EthAddressSchema,
@@ -171,22 +172,14 @@ export class MemecoinSDK {
 
     const walletClient = this.walletClient
 
-    const { antiSnipeAmount, marketCap, name, ticker, creator } = launchParams
+    const { antiSnipeAmount, marketCap, name, ticker, creator, salt, ethToRaise, token } =
+      launchParams
 
     let dexMetadata: DexMetadata | undefined
     const account = walletClient.account
     if (isNull(account)) {
       throw new Error('No account found')
     }
-
-    const ethToRaise = marketCap > 0 ? await this.getEthToRaise(marketCap) : 0n
-
-    const { salt, token } = await this.predictToken({
-      name,
-      symbol: ticker,
-      account: creator ?? account.address,
-      seed: Date.now().toString()
-    })
 
     const launchData = encodeFunctionData({
       abi: MEMECOIN_V5_LAUNCH_ABI,
@@ -277,14 +270,6 @@ export class MemecoinSDK {
     return parseEther(eth.toString())
   }
 
-  private async getERC20Allowance(
-    tokenAddress: EthAddress,
-    spenderAddress: EthAddress,
-    accountAddress: EthAddress
-  ): Promise<bigint> {
-    return this.api.getERC20Allowance(tokenAddress, spenderAddress, accountAddress)
-  }
-
   private async predictToken(params: PredictTokenParams): Promise<PredictTokenResponse> {
     const { account, name, symbol, seed } = params
 
@@ -305,12 +290,12 @@ export class MemecoinSDK {
     }
   }
 
-  async estimateLaunchBuy(params: EstimateLaunchBuyParams): Promise<bigint> {
+  async estimateLaunch(params: EstimateLaunchParams): Promise<EstimateLaunchResponse> {
     const { name, ticker, antiSnipeAmount, account, marketCap } = params
 
     const ethToRaise = marketCap > 0 ? await this.getEthToRaise(marketCap) : 0n
 
-    const { salt } = await this.predictToken({
+    const { salt, token } = await this.predictToken({
       name,
       symbol: ticker,
       account,
@@ -327,6 +312,12 @@ export class MemecoinSDK {
     }
     const { result } = await this.publicClient.simulateContract(launchTx)
     const [, , , amountSwapped] = LaunchResultSchema.parse(result)
-    return amountSwapped
+
+    return {
+      salt,
+      token,
+      amountOut: amountSwapped,
+      ethToRaise
+    }
   }
 }

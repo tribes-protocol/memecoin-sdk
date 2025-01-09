@@ -41,6 +41,9 @@ export interface LaunchCoinParams {
   antiSnipeAmount: bigint
   description: string
   image: string
+  salt: HexString
+  ethToRaise: bigint
+  token: EthAddress
   creator?: EthAddress
   website?: string
   twitter?: string
@@ -50,8 +53,15 @@ export interface LaunchCoinParams {
   farcasterId?: number
 }
 
-export type EstimateLaunchBuyParams = Omit<LaunchCoinParams, 'description' | 'image'> & {
+export type EstimateLaunchParams = Omit<LaunchCoinParams, 'description' | 'image'> & {
   account: EthAddress
+}
+
+export interface EstimateLaunchResponse {
+  salt: HexString
+  token: EthAddress
+  amountOut: bigint
+  ethToRaise: bigint
 }
 
 export const DexMetadataSchema = z.object({

@@ -2,7 +2,8 @@
 
 import { MemecoinSDK } from '@/Memecoin'
 import {
-  EstimateLaunchBuyParams,
+  EstimateLaunchParams,
+  EstimateLaunchResponse,
   EstimateSwapParams,
   EthAddress,
   HexString,
@@ -22,7 +23,7 @@ interface MemecoinContextType {
   estimateSwap: (params: EstimateSwapParams) => Promise<SwapEstimation>
   swap: (params: SwapParams) => Promise<HexString>
   launchCoin: (params: LaunchCoinParams) => Promise<LaunchCoinResponse>
-  estimateLaunchBuy: (params: EstimateLaunchBuyParams) => Promise<bigint>
+  estimateLaunch: (params: EstimateLaunchParams) => Promise<EstimateLaunchResponse>
 }
 
 interface MemecoinProviderProps {
@@ -63,7 +64,7 @@ export const MemecoinProvider = ({
       estimateSwap: sdk.estimateSwap.bind(sdk),
       swap: sdk.swap.bind(sdk),
       launchCoin: sdk.launch.bind(sdk),
-      estimateLaunchBuy: sdk.estimateLaunchBuy.bind(sdk)
+      estimateLaunch: sdk.estimateLaunch.bind(sdk)
     }
   }, [walletClient?.account.address, rpcUrl, apiBaseUrl])
 
