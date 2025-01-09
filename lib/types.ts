@@ -53,8 +53,12 @@ export interface LaunchCoinParams {
   farcasterId?: number
 }
 
-export type EstimateLaunchParams = Omit<LaunchCoinParams, 'description' | 'image'> & {
+export interface EstimateLaunchParams {
   account: EthAddress
+  name: string
+  ticker: string
+  antiSnipeAmount: bigint
+  marketCap: number
 }
 
 export interface EstimateLaunchResponse {

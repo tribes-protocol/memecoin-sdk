@@ -27,11 +27,16 @@ async function launchToken(): Promise<void> {
       account: account.address
     }
 
-    const estimate = await sdk.estimateLaunchBuy(launchParams)
+    const { salt, token, amountOut, ethToRaise } = await sdk.estimateLaunch(launchParams)
 
-    console.log('estimate', formatEther(estimate))
+    console.log('estimate', formatEther(amountOut))
 
-    const result = await sdk.launch(launchParams)
+    const result = await sdk.launch({
+      ...launchParams,
+      salt,
+      token,
+      ethToRaise
+    })
 
     console.log('Launch successful!')
     console.log('Contract Address:', result.contractAddress)
@@ -44,7 +49,7 @@ async function launchToken(): Promise<void> {
 async function swapToken(): Promise<void> {
   try {
     const { amountOut, swapParams } = await sdk.estimateSwap({
-      address: account.address,
+      account: account.address,
       tokenIn: '0x4200000000000000000000000000000000000006',
       amountIn: parseEther('0.0001'),
       tokenOut: '0x1ecc800Bc0471F2DFCbd50b2a306D76D22eA3caa' // TEST token on bonding curve
