@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.37
+
+### Patch Changes
+
+- bab424d: changes to launch
+
 ## 0.0.36
 
 ### Patch Changes
