@@ -235,7 +235,8 @@ export class TokenSwapper {
       abi: SWAP_ABI as Abi,
       address: TOKEN_SWAPPER_ADDRESS,
       functionName: 'swap',
-      args: [args]
+      args: [args],
+      value: tokenIn === WETH_ADDRESS ? amountIn : 0n
     } as const
 
     if (isBatchSupported) {
