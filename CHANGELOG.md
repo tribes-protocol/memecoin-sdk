@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.39
+
+### Patch Changes
+
+- 8740717: fix coinbase smart wallet
+
 ## 0.0.38
 
 ### Patch Changes
