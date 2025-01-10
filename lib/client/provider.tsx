@@ -56,8 +56,6 @@ export const MemecoinProvider = ({
       apiBaseUrl
     })
 
-    console.log('memecoin.new sdk initialized')
-
     return {
       getCoin: sdk.getCoin.bind(sdk),
       getTrending: sdk.getTrending.bind(sdk),

@@ -176,6 +176,7 @@ export class MemecoinSDK {
       launchParams
 
     const dexMetadata: DexMetadata = {
+      kind: 'memecoinv5',
       targetMarketCap: marketCap,
       ethAmountToRaise: ethToRaise
     }

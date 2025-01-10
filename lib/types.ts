@@ -69,6 +69,7 @@ export interface EstimateLaunchResponse {
 }
 
 export const DexMetadataUniv3Schema = z.object({
+  kind: z.literal('univ3'),
   lpNftId: z.string(),
   lockerAddress: EthAddressSchema
 })
@@ -76,6 +77,7 @@ export const DexMetadataUniv3Schema = z.object({
 export type DexMetadataUniv3 = z.infer<typeof DexMetadataUniv3Schema>
 
 export const DexMetadataMemecoinV5Schema = z.object({
+  kind: z.literal('memecoinv5'),
   marketAddress: EthAddressSchema.optional(),
   wethNFTId: z.union([z.bigint(), z.string().transform((arg) => BigInt(arg))]).optional(),
   memeNFTId: z.union([z.bigint(), z.string().transform((arg) => BigInt(arg))]).optional(),
@@ -85,7 +87,10 @@ export const DexMetadataMemecoinV5Schema = z.object({
 
 export type DexMetadataMemecoinV5 = z.infer<typeof DexMetadataMemecoinV5Schema>
 
-export const DexMetadataSchema = z.union([DexMetadataUniv3Schema, DexMetadataMemecoinV5Schema])
+export const DexMetadataSchema = z.discriminatedUnion('kind', [
+  DexMetadataUniv3Schema,
+  DexMetadataMemecoinV5Schema
+])
 
 export type DexMetadata = z.infer<typeof DexMetadataSchema>
 export interface LaunchCoinResponse {
