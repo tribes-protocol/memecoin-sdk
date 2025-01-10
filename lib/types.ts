@@ -72,8 +72,8 @@ export const DexMetadataSchema = z.object({
   marketAddress: EthAddressSchema.optional(),
   wethNFTId: z.string().optional(),
   memeNFTId: z.string().optional(),
-  targetMarketCap: z.number().optional(),
-  ethAmountToRaise: z.number().optional()
+  targetMarketCap: z.number(),
+  ethAmountToRaise: z.number()
 })
 
 export type DexMetadata = z.infer<typeof DexMetadataSchema>
