@@ -80,7 +80,7 @@ export const DexMetadataMemecoinV5Schema = z.object({
   wethNFTId: z.string().optional(),
   memeNFTId: z.string().optional(),
   targetMarketCap: z.number(),
-  ethAmountToRaise: z.number()
+  ethAmountToRaise: z.string().transform((arg) => BigInt(arg))
 })
 
 export type DexMetadataMemecoinV5 = z.infer<typeof DexMetadataMemecoinV5Schema>

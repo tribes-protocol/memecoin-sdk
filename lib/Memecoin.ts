@@ -41,7 +41,6 @@ import {
   createPublicClient,
   decodeEventLog,
   encodeFunctionData,
-  formatEther,
   http,
   parseEther,
   PublicClient,
@@ -178,7 +177,7 @@ export class MemecoinSDK {
 
     const dexMetadata: DexMetadata = {
       targetMarketCap: marketCap,
-      ethAmountToRaise: Number(formatEther(ethToRaise))
+      ethAmountToRaise: ethToRaise
     }
 
     const account = walletClient.account
