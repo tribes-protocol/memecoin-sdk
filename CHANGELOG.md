@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.43
+
+### Patch Changes
+
+- 8183e9f: convert market cap to usdc (\* 1e6)
+
 ## 0.0.42
 
 ### Patch Changes
