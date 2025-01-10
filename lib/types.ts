@@ -71,7 +71,9 @@ export interface EstimateLaunchResponse {
 export const DexMetadataSchema = z.object({
   marketAddress: EthAddressSchema.optional(),
   wethNFTId: z.string().optional(),
-  memeNFTId: z.string().optional()
+  memeNFTId: z.string().optional(),
+  targetMarketCap: z.number().optional(),
+  ethAmountToRaise: z.number().optional()
 })
 
 export type DexMetadata = z.infer<typeof DexMetadataSchema>

@@ -41,6 +41,7 @@ import {
   createPublicClient,
   decodeEventLog,
   encodeFunctionData,
+  formatEther,
   http,
   parseEther,
   PublicClient,
@@ -175,7 +176,11 @@ export class MemecoinSDK {
     const { antiSnipeAmount, marketCap, name, ticker, creator, salt, ethToRaise, token } =
       launchParams
 
-    let dexMetadata: DexMetadata | undefined
+    const dexMetadata: DexMetadata = {
+      targetMarketCap: marketCap,
+      ethAmountToRaise: Number(formatEther(ethToRaise))
+    }
+
     const account = walletClient.account
     if (isNull(account)) {
       throw new Error('No account found')
@@ -221,10 +226,8 @@ export class MemecoinSDK {
 
       const args = TokenGraduatedEventArgsSchema.parse(parsedLog.args)
 
-      dexMetadata = {
-        wethNFTId: args.wethTokenId.toString(),
-        memeNFTId: args.memeTokenId.toString()
-      }
+      dexMetadata.wethNFTId = args.wethTokenId.toString()
+      dexMetadata.memeNFTId = args.memeTokenId.toString()
     } else {
       // market launch
       const result = await retry(() =>
@@ -237,9 +240,7 @@ export class MemecoinSDK {
 
       const marketAddress = EthAddressSchema.parse(result)
 
-      dexMetadata = {
-        marketAddress
-      }
+      dexMetadata.marketAddress = marketAddress
     }
 
     await this.api.launchCoin(
