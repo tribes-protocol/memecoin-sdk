@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.40
+
+### Patch Changes
+
+- e9f448e: dex metadata
+
 ## 0.0.39
 
 ### Patch Changes
