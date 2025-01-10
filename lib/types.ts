@@ -77,10 +77,10 @@ export type DexMetadataUniv3 = z.infer<typeof DexMetadataUniv3Schema>
 
 export const DexMetadataMemecoinV5Schema = z.object({
   marketAddress: EthAddressSchema.optional(),
-  wethNFTId: z.string().optional(),
-  memeNFTId: z.string().optional(),
+  wethNFTId: z.union([z.bigint(), z.string().transform((arg) => BigInt(arg))]).optional(),
+  memeNFTId: z.union([z.bigint(), z.string().transform((arg) => BigInt(arg))]).optional(),
   targetMarketCap: z.number(),
-  ethAmountToRaise: z.string().transform((arg) => BigInt(arg))
+  ethAmountToRaise: z.union([z.bigint(), z.string().transform((arg) => BigInt(arg))])
 })
 
 export type DexMetadataMemecoinV5 = z.infer<typeof DexMetadataMemecoinV5Schema>
