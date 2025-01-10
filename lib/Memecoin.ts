@@ -177,7 +177,7 @@ export class MemecoinSDK {
 
     const dexMetadata: DexMetadata = {
       kind: 'memecoinv5',
-      targetMarketCap: marketCap * 1e6,
+      targetMarketCap: marketCap,
       ethAmountToRaise: ethToRaise
     }
 
@@ -207,7 +207,7 @@ export class MemecoinSDK {
       confirmations: 2
     })
     const blockNumber = receipt.blockNumber
-    const isDirectLaunch = marketCap === 0
+    const isDirectLaunch = marketCap === 0n
 
     if (isDirectLaunch) {
       // direct launch
@@ -265,9 +265,10 @@ export class MemecoinSDK {
     }
   }
 
-  private async getEthToRaise(marketCap: number): Promise<bigint> {
+  private async getEthToRaise(marketCap: bigint): Promise<bigint> {
     const ethPrice = await this.uniswapV3.fetchEthereumPrice()
-    const eth = (marketCap / (5 * ethPrice.price.toNumber())) * 1.03
+    const marketCapNum = Number(marketCap) / 1e6
+    const eth = (marketCapNum / (5 * ethPrice.price.toNumber())) * 1.03
     return parseEther(eth.toString())
   }
 

@@ -35,7 +35,7 @@ export type MemecoinSDKConfig =
     })
 
 export interface LaunchCoinParams {
-  marketCap: number // market cap in USD, 0 for direct launch
+  marketCap: bigint // market cap in USDC ( * 1e6), 0 for direct launch
   name: string
   ticker: string
   antiSnipeAmount: bigint
@@ -58,7 +58,7 @@ export interface EstimateLaunchParams {
   name: string
   ticker: string
   antiSnipeAmount: bigint
-  marketCap: number
+  marketCap: bigint
 }
 
 export interface EstimateLaunchResponse {
@@ -81,7 +81,7 @@ export const DexMetadataMemecoinV5Schema = z.object({
   marketAddress: EthAddressSchema.optional(),
   wethNFTId: z.union([z.bigint(), z.string().transform((arg) => BigInt(arg))]).optional(),
   memeNFTId: z.union([z.bigint(), z.string().transform((arg) => BigInt(arg))]).optional(),
-  targetMarketCap: z.number(),
+  targetMarketCap: z.union([z.bigint(), z.string().transform((arg) => BigInt(arg))]),
   ethAmountToRaise: z.union([z.bigint(), z.string().transform((arg) => BigInt(arg))])
 })
 

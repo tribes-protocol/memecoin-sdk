@@ -3,15 +3,16 @@ import { MemecoinSDK } from '@/Memecoin'
 import { createWalletClient, formatEther, http, parseEther } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
+const ethRPC = 'https://base-mainnet.g.alchemy.com/v2/redacted'
 const account = privateKeyToAccount('0xredacted')
 const walletClient = createWalletClient({
   account,
-  transport: http('https://base-mainnet.g.alchemy.com/v2/redacted')
+  transport: http(ethRPC)
 })
 
 // Initialize SDK
 const sdk = new MemecoinSDK({
-  rpcUrl: 'https://base-mainnet.g.alchemy.com/v2/redacted',
+  rpcUrl: ethRPC,
   walletClient
 })
 
@@ -20,7 +21,7 @@ async function launchToken(): Promise<void> {
     const launchParams = {
       name: 'Test Coin',
       ticker: 'TEST',
-      marketCap: 21000,
+      marketCap: BigInt(21000 * 1e6),
       antiSnipeAmount: parseEther('0.00001'), // 0.1 ETH anti-snipe,
       description: 'Test Coin',
       image: 'https://via.placeholder.com/150',
