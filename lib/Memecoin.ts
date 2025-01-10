@@ -246,7 +246,7 @@ export class MemecoinSDK {
     await this.api.launchCoin(
       {
         ...launchParams,
-        dexMetadata: dexMetadata ? JSON.stringify(dexMetadata) : null,
+        dexMetadata,
         dexInitiated: isDirectLaunch,
         dexInitiatedBlock: isDirectLaunch ? blockNumber : null,
         censored: false,
