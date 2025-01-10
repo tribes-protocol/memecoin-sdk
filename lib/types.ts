@@ -68,14 +68,26 @@ export interface EstimateLaunchResponse {
   ethToRaise: bigint
 }
 
-export const DexMetadataSchema = z.object({
-  marketAddress: EthAddressSchema.optional(),
-  wethNFTId: z.string().optional(),
-  memeNFTId: z.string().optional()
+export const DexMetadataUniv3Schema = z.object({
+  lpNftId: z.string(),
+  lockerAddress: EthAddressSchema
 })
 
-export type DexMetadata = z.infer<typeof DexMetadataSchema>
+export type DexMetadataUniv3 = z.infer<typeof DexMetadataUniv3Schema>
 
+export const DexMetadataMemecoinV5Schema = z.object({
+  marketAddress: EthAddressSchema.optional(),
+  wethNFTId: z.string().optional(),
+  memeNFTId: z.string().optional(),
+  targetMarketCap: z.number(),
+  ethAmountToRaise: z.string().transform((arg) => BigInt(arg))
+})
+
+export type DexMetadataMemecoinV5 = z.infer<typeof DexMetadataMemecoinV5Schema>
+
+export const DexMetadataSchema = z.union([DexMetadataUniv3Schema, DexMetadataMemecoinV5Schema])
+
+export type DexMetadata = z.infer<typeof DexMetadataSchema>
 export interface LaunchCoinResponse {
   contractAddress: EthAddress
   txHash: HexString
@@ -152,7 +164,7 @@ export const CoinSchema = z.object({
   farcasterId: z.number().nullable().optional(),
   dexKind: z.enum(['univ2', 'univ3', 'univ3-bonding', 'memecoinv5']),
   marketAddress: EthAddressSchema.nullable().optional(),
-  dexMetadata: z.string().nullable().optional()
+  dexMetadata: DexMetadataSchema.nullable().optional()
 })
 
 export type Coin = z.infer<typeof CoinSchema>
