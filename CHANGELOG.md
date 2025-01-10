@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.44
+
+### Patch Changes
+
+- 06944f0: fix formatting of target market cap
+
 ## 0.0.43
 
 ### Patch Changes
