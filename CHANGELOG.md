@@ -1,5 +1,11 @@
 # @memecoin/sdk
 
+## 0.0.45
+
+### Patch Changes
+
+- aea2a15: updating migration type lag
+
 ## 0.0.44
 
 ### Patch Changes
