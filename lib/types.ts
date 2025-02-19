@@ -193,7 +193,7 @@ export type CreateCoin = z.infer<typeof CreateCoinSchema>
 
 export const UserSchema = z.object({
   id: z.number(),
-  address: EthAddressSchema,
+  identity: EthAddressSchema,
   username: z.string(),
   bio: z.string().nullable(),
   image: z.string().nullable()
